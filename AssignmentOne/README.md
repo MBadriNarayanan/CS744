@@ -11,8 +11,7 @@ Using the instructions mentioned in this [website](https://pages.cs.wisc.edu/~sh
 ## Part Two: Simple Spark Application
 
 For this part, we were required to develop a simple Spark application to read a dataframe, sort the dataframe based on country code and timestamp values. The sorted dataframe needs to be saved in HDFS.
-
-* Created a virtual environment `working_environment` and installed the requirements in `requirements.txt` 
+ 
 * Added the input file `export.csv` to the `data` folder.
 * Added the helper function `create_spark_application()` to `spark_utils.py`. This function used to create a spark application based on the default config. It takes in application name as input parameter and returns the created spark application.
 * The function `sort_data()` is added in the python script `part_two.py` which performs the task of sorting the dataframe based on the input columns. The input paramters are: Input Dataframe Path and Output Dataframe Folder.
