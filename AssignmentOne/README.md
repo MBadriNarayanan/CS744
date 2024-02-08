@@ -12,8 +12,8 @@ Using the instructions mentioned in this [website](https://pages.cs.wisc.edu/~sh
 
 For this part, we were required to develop a simple Spark application to read a dataframe, sort the dataframe based on country code and timestamp values. The sorted dataframe needs to be saved in HDFS.
  
-* Added the input file `export.csv` to the `data` folder.
+* Added the input file `export.csv` to the `data` folder in HDFS using this command `hadoop fs -put /users/mbadnara/CS744/AssignmentOne/data/export.csv hdfs://10.10.1.1:9000/user/mbadnara/data/`.
 * Added the helper function `create_spark_application()` to `spark_utils.py`. This function used to create a spark application based on the default config. It takes in application name as input parameter and returns the created spark application.
-* The function `sort_data()` is added in the python script `part_two.py` which performs the task of sorting the dataframe based on the input columns. The input paramters are: Input Dataframe Path and Output Dataframe Folder.
-* A bash script `part_two.sh` is created to run the spark application using the command: `$SPARK_HOME/bin/spark-submit --master $SPARK_MASTER_URL $PYTHON_SCRIPT $INPUT_DATAFRAME_PATH $OUTPUT_DATAFRAME_FOLDER` with values for each variables set in the bash script.
-* This script will create the sorted dataframe and saves the output CSV file at `$OUTPUT_DATAFRAME_FOLDER/output.csv`.
+* The function `sort_data()` is added in the python script `part_two.py` which performs the task of sorting the dataframe based on the input columns. The input paramters are: Input Dataframe Path and Output Dataframe Path.
+* A bash script `part_two.sh` is created to run the spark application using the command: `$SPARK_HOME/bin/spark-submit --master $SPARK_MASTER_URL $PYTHON_SCRIPT $INPUT_DATAFRAME_PATH $OUTPUT_DATAFRAME_PATH` with values for each variables set in the bash script.
+* This script will create the sorted dataframe and saves the output CSV file at `$OUTPUT_DATAFRAME_PATH` in HDFS.
