@@ -17,3 +17,23 @@ For this part, we were required to develop a simple Spark application to read a 
 * The function `sort_data()` is added in the python script `part_two.py` which performs the task of sorting the dataframe based on the input columns. The input paramters are: Input Dataframe Path and Output Dataframe Path.
 * A bash script `part_two.sh` is created to run the spark application using the command: `$SPARK_HOME/bin/spark-submit --master $SPARK_MASTER_URL $PYTHON_SCRIPT $INPUT_DATAFRAME_PATH $OUTPUT_DATAFRAME_PATH` with values for each variables set in the bash script.
 * This script will create the sorted dataframe and saves the output CSV file at `$OUTPUT_DATAFRAME_PATH` in HDFS.
+
+## Part Three: Page Rank
+
+For this part, we were required to implement the PageRank algorithm.
+
+### Task One
+
+#### Write a Scala/Python/Java Spark application that implements the PageRank algorithm.
+
+### Task Two
+
+#### In order to achieve high parallelism, Spark will split the data into smaller chunks called partitions which are distributed across different nodes in the cluster. Partitions can be changed in several ways. For example, any shuffle operation on a DataFrame (e.g., join()) will result in a change in partitions (customizable via user’s configuration). In addition, one can also decide how to partition data when writing DataFrames back to disk. For this task, add appropriate custom DataFrame/RDD partitioning and see what changes.
+
+### Task Three
+
+#### Persist the appropriate DataFrame/RDD(s) as in-memory objects and see what changes.
+
+### Task Four
+
+#### Kill a Worker process and see the changes. You should trigger the failure to a desired worker VM when the application reaches 25% and 75% of its lifetime.
