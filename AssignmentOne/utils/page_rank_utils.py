@@ -1,13 +1,14 @@
 import os
 import random
 
+from pyspark.storagelevel import StorageLevel
+
 
 def parse_neighbors(line, flag):
+    line = line.split("\t")
     if flag:
-        line = line.split()
         return int(line[0]), int(line[1])
     else:
-        line = line.split("\t")
         return line[0], line[1]
 
 
@@ -18,7 +19,7 @@ def compute_contribs(neighbor_page_rank):
         yield neighbor, rank / len(data)
 
 
-def page_rank(links, epochs, d):
+def page_rank(links, epochs, d, persist_flag):
     ranks = links.mapValues(lambda neighbors: 1.0)
     for epoch in range(epochs):
         contributions = links.join(ranks).flatMap(
@@ -27,6 +28,8 @@ def page_rank(links, epochs, d):
         ranks = contributions.reduceByKey(lambda x, y: x + y).mapValues(
             lambda rank: (1 - d) + d * rank
         )
+        if persist_flag:
+            ranks.persist()
     return ranks
 
 
@@ -70,9 +73,9 @@ def compute_page_rank(
             data.append(sc.parallelize(partition))
         input_links = data[0]
     input_links = input_links.distinct().groupByKey()
-    if persist_flag:
-        input_links = input_links.cache()
-    page_ranks = page_rank(links=input_links, epochs=epochs, d=d)
+    page_ranks = page_rank(
+        links=input_links, epochs=epochs, d=d, persist_flag=persist_flag
+    )
     result = page_ranks.collect()
     result = sc.parallelize(result)
     return result
