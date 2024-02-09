@@ -40,7 +40,7 @@ For this part, we were required to develop a simple Spark application to read a 
 
 #### In order to achieve high parallelism, Spark will split the data into smaller chunks called partitions which are distributed across different nodes in the cluster. Partitions can be changed in several ways. For example, any shuffle operation on a DataFrame (e.g., join()) will result in a change in partitions (customizable via user’s configuration). In addition, one can also decide how to partition data when writing DataFrames back to disk. For this task, add appropriate custom DataFrame/RDD partitioning and see what changes.
 
-* Based on the variables set in `run.sh`, this will perform a custom partitioning with size `20` with no persist.
+* Based on the variables set in `run.sh`, this will perform a custom partitioning (shuffle) with size `20` with no persist.
 
 ### Task Three
 
