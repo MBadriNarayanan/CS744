@@ -113,5 +113,5 @@ if __name__ == "__main__":
     )
 
     print(
-        "\n--------------------\nPage Rank algorithm has been successfully!\n--------------------\n"
+        "\n--------------------\nPage Rank algorithm has been successfully completed!\n--------------------\n"
     )
