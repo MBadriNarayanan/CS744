@@ -44,10 +44,16 @@ def create_helper_directories(checkpoint_dir, logs_dir, task_name, flag=False):
     logs_path = os.path.join(logs_dir, "logs.txt")
     report_path = os.path.join(logs_dir, "report.txt")
 
+    print("Checkpoints will be stored at: {}!".format(checkpoint_dir))
+    print("Training logs will be stored at: {}!".format(logs_path))
+    print("Evaluation report will be stored at: {}!".format(report_path))
+
     return checkpoint_dir, logs_path, report_path
 
 
-def generate_report(ground_truth, prediction, test_loss, report_path, checkpoint_path):
+def generate_eval_report(
+    ground_truth, prediction, test_loss, report_path, checkpoint_path
+):
     test_accuracy = accuracy_score(ground_truth, prediction)
     report = classification_report(
         ground_truth,
