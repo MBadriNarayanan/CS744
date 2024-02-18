@@ -18,7 +18,7 @@ from utils.model import VGG11
 from torch.nn.functional import log_softmax
 
 torch.set_num_threads(4)
-
+torch.manual_seed(42)
 
 def train_model(
     model,
