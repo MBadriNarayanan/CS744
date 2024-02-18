@@ -1,4 +1,9 @@
 import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import time
 import torch
 
 from sklearn.metrics import accuracy_score
@@ -31,12 +36,24 @@ def train_model(
             "Logs for the checkpoint stored at: {}/\n".format(checkpoint_dir)
         )
     model.train()
-    train_dataset_length = len(train_loader.dataset)
+
+    epoch_duration_list = []
 
     for epoch in range(start_epoch, end_epoch + 1):
-        train_accuracy = 0.0
+        train_loss_list = []
+        train_accuracy_list = []
+        train_duration_list = []
+
         train_loss = 0.0
+        train_accuracy = 0.0
+        avg_batch_duration = 0.0
+
+        start_time = time.time()
+        end_time = 0.0
+        epoch_duration = 0.0
+
         for batch_idx, (data, target) in enumerate(train_loader):
+            batch_start_time = time.time()
             data, target = data.to(device), target.to(device)
 
             optimizer.zero_grad()
@@ -51,14 +68,19 @@ def train_model(
             y_pred = y_pred.detach().cpu().tolist()
             target = target.detach().cpu().tolist()
 
+            batch_end_time = time.time()
+            batch_duration = batch_end_time - batch_start_time
+
             batch_accuracy = accuracy_score(target, y_pred)
-            train_loss += batch_loss
-            train_accuracy += batch_accuracy
+
+            train_loss_list.append(batch_loss)
+            train_accuracy_list.append(batch_accuracy)
+            train_duration_list.append(batch_duration)
 
             if batch_idx % 20 == 0:
                 print(
-                    "Batch Idx: {}, Batch Loss: {:.3f}, Batch Accuracy: {:.3f}".format(
-                        batch_idx, batch_loss, batch_accuracy
+                    "Batch Idx: {}, Batch Loss: {:.3f}, Batch Accuracy: {:.3f}, Batch Duration: {:.3f} seconds".format(
+                        batch_idx, batch_loss, batch_accuracy, batch_duration
                     )
                 )
                 print("--------------------")
@@ -68,22 +90,33 @@ def train_model(
             del data, target
             del y_hat, loss, y_pred
             del batch_loss, batch_accuracy
+            del batch_start_time, batch_end_time
 
-        train_loss = train_loss / train_dataset_length
-        train_accuracy = train_accuracy / train_dataset_length
+        end_time = time.time()
+        epoch_duration = end_time - start_time
+        epoch_duration_list.append(epoch_duration)
+
+        train_loss = sum(train_loss_list) / len(train_loss_list)
+        train_accuracy = sum(train_accuracy_list) / len(train_accuracy_list)
+        avg_batch_duration = sum(train_duration_list) / len(train_duration_list)
 
         with open(logs_path, "at") as logs_file:
             logs_file.write(
-                "Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}\n".format(
-                    epoch, train_loss, train_accuracy
+                "Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}, Avg Batch Duration: {:.3f} seconds, Epoch Duration: {:.3f} seconds\n".format(
+                    epoch,
+                    train_loss,
+                    train_accuracy,
+                    avg_batch_duration,
+                    epoch_duration,
                 )
             )
         print(
-            "Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}".format(
-                epoch, train_loss, train_accuracy
+            "Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}, Avg Batch Duration: {:.3f} seconds, Epoch Duration: {:.3f} seconds".format(
+                epoch, train_loss, train_accuracy, avg_batch_duration, epoch_duration
             )
         )
         print("--------------------")
+
         ckpt_path = "{}/Epoch_{}.pt".format(checkpoint_dir, str(epoch))
         torch.save(
             {
@@ -94,7 +127,14 @@ def train_model(
             },
             ckpt_path,
         )
-        del train_loss, train_accuracy
+        del train_loss_list, train_accuracy_list, train_duration_list
+        del train_loss, train_accuracy, avg_batch_duration
+        del start_time, end_time, epoch_duration
+
+    avg_epoch_duration = sum(epoch_duration_list) / len(epoch_duration_list)
+    print("Avg Epoch Duration: {:.3f} seconds".format(avg_epoch_duration))
+    print("--------------------")
+    del avg_epoch_duration, epoch_duration_list
 
 
 def evaluate_model(
