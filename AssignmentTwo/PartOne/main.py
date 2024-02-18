@@ -1,9 +1,10 @@
 import os
 import torch
 
+from sklearn.metrics import accuracy_score
 from utils.general_utils import (
     create_helper_directories,
-    generate_report,
+    generate_eval_report,
     load_dataset,
     prepare_model_for_evaluation,
     prepare_model_for_training,
@@ -131,7 +132,7 @@ def evaluate_model(
             del y_hat, y_pred
             del item_loss
 
-    generate_report(
+    generate_eval_report(
         ground_truth=ground_truth,
         prediction=prediction,
         test_loss=test_loss,
