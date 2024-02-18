@@ -9,7 +9,7 @@ import torch
 from sklearn.metrics import accuracy_score
 from utils.general_utils import (
     create_helper_directories,
-    generate_eval_report,
+    evaluate_model,
     load_dataset,
     prepare_model_for_evaluation,
     prepare_model_for_training,
@@ -135,50 +135,6 @@ def train_model(
     print("Avg Epoch Duration: {:.3f} seconds".format(avg_epoch_duration))
     print("--------------------")
     del avg_epoch_duration, epoch_duration_list
-
-
-def evaluate_model(
-    model,
-    device,
-    criterion,
-    test_loader,
-    report_path,
-    checkpoint_path,
-):
-    ground_truth = []
-    prediction = []
-
-    with torch.no_grad():
-        model.eval()
-        test_loss = 0.0
-
-        for _, (data, target) in enumerate(test_loader):
-            data, target = data.to(device), target.to(device)
-
-            y_hat = model(data)
-            loss = criterion(y_hat, target)
-            item_loss = loss.item()
-
-            y_pred = log_softmax(y_hat, dim=1)
-            y_pred = torch.argmax(y_pred, dim=1)
-            y_pred = y_pred.detach().cpu().tolist()[0]
-            target = target.detach().cpu().tolist()[0]
-
-            test_loss += item_loss
-            ground_truth.append(target)
-            prediction.append(y_pred)
-
-            del data, target
-            del y_hat, y_pred
-            del item_loss
-
-    generate_eval_report(
-        ground_truth=ground_truth,
-        prediction=prediction,
-        test_loss=test_loss,
-        report_path=report_path,
-        checkpoint_path=checkpoint_path,
-    )
 
 
 def main():
