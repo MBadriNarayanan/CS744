@@ -109,7 +109,7 @@ if __name__ == "__main__":
         "--master-ip", "-M", type=str, help="Master IP address", required=True
     )
     parser.add_argument(
-        "--num-nodes", "N", type=int, help="Number of nodes", required=True
+        "--num-nodes", "-N", type=int, help="Number of nodes", required=True
     )
     parser.add_argument("--rank", "-R", type=int, help="Rank", required=True)
     args = parser.parse_args()
