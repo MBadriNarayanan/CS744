@@ -58,9 +58,13 @@ def create_helper_directories(checkpoint_dir, logs_dir, task_name, flag=False):
 
 
 def distributed_setup(master_ip, master_port, rank, world_size):
-    os.environ["MASTER_ADDR"] = master_ip
-    os.environ["MASTER_PORT"] = master_port
-    dist.init_process_group("gloo", rank=rank, world_size=world_size)
+    dist.init_process_group(
+        "gloo",
+        init_method="tcp://{}:{}".format(master_ip, master_port),
+        rank=rank,
+        world_size=world_size,
+    )
+    print("Running Rank: {}!".format(rank))
 
 
 def generate_eval_report(
