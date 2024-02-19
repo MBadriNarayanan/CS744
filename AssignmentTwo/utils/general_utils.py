@@ -334,15 +334,28 @@ def train_model(
         print("--------------------")
 
         ckpt_path = "{}/Epoch_{}.pt".format(checkpoint_dir, str(epoch))
-        torch.save(
-            {
-                "epoch": epoch,
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "loss": train_loss,
-            },
-            ckpt_path,
-        )
+
+        if distribute_flag:
+            if device == 0:
+                torch.save(
+                    {
+                        "epoch": epoch,
+                        "model_state_dict": model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "loss": train_loss,
+                    },
+                    ckpt_path,
+                )
+        else:
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "loss": train_loss,
+                },
+                ckpt_path,
+            )
         del train_loss_list, train_accuracy_list, train_duration_list
         del train_loss, train_accuracy, avg_batch_duration
         del start_time, end_time, epoch_duration
