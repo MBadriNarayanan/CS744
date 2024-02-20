@@ -32,23 +32,26 @@ def create_directory(directory):
         print("Directory: {} already exists!".format(directory))
 
 
-def create_helper_directories(checkpoint_dir, logs_dir, task_name, flag=False):
+def create_helper_directories(
+    checkpoint_dir, logs_dir, task_name, sub_task_name, rank, flag=False
+):
     create_directory(directory=checkpoint_dir)
-    checkpoint_dir = os.path.join(checkpoint_dir, "PartOne")
+    checkpoint_dir = os.path.join(checkpoint_dir, task_name)
     create_directory(directory=checkpoint_dir)
 
     create_directory(directory=logs_dir)
-    logs_dir = os.path.join(logs_dir, "PartOne")
+    logs_dir = os.path.join(logs_dir, task_name)
     create_directory(directory=logs_dir)
 
     if flag:
-        checkpoint_dir = os.path.join(checkpoint_dir, task_name)
-        logs_dir = os.path.join(logs_dir, task_name)
+        checkpoint_dir = os.path.join(checkpoint_dir, sub_task_name)
+        logs_dir = os.path.join(logs_dir, sub_task_name)
         create_directory(directory=checkpoint_dir)
         create_directory(directory=logs_dir)
 
-    logs_path = os.path.join(logs_dir, "logs.txt")
-    report_path = os.path.join(logs_dir, "report.txt")
+    if rank != "":
+        logs_path = os.path.join(logs_dir, "logs_rank{}.txt".format(rank))
+        report_path = os.path.join(logs_dir, "report_rank{}.txt".format(rank))
 
     print("Checkpoints will be stored at: {}!".format(checkpoint_dir))
     print("Training logs will be stored at: {}!".format(logs_path))
@@ -57,10 +60,14 @@ def create_helper_directories(checkpoint_dir, logs_dir, task_name, flag=False):
     return checkpoint_dir, logs_path, report_path
 
 
-def distributed_setup(master_ip, master_port, rank, world_size):
+def distributed_setup(master_ip, rank, world_size):
+    os.environ["MASTER_ADDR"] = master_ip
+    os.environ["MASTER_PORT"] = "1024"
     dist.init_process_group(
         "gloo",
-        init_method="tcp://{}:{}".format(master_ip, master_port),
+        init_method="tcp://{}:{}".format(
+            os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"]
+        ),
         rank=rank,
         world_size=world_size,
     )
@@ -197,7 +204,6 @@ def prepare_model_for_training(
     continue_flag,
     continue_checkpoint_path="",
     distribute_flag=False,
-    rank="",
 ):
     criterion = CrossEntropyLoss()
     optimizer = SGD(
@@ -206,12 +212,10 @@ def prepare_model_for_training(
         momentum=momentum,
         weight_decay=weight_decay,
     )
+    model = model.to(device)
+    criterion = criterion.to(device)
     if distribute_flag:
-        model = DDP(model, device_ids=[rank])
-        model = model.to(rank)
-    else:
-        model = model.to(device)
-        criterion = criterion.to(device)
+        model = DDP(model)
 
     if continue_flag:
         print("Model loaded for further training!")
@@ -244,6 +248,7 @@ def train_model(
     logs_path,
     checkpoint_dir,
     distribute_flag,
+    rank="",
 ):
     with open(logs_path, "at") as logs_file:
         logs_file.write(
@@ -293,7 +298,7 @@ def train_model(
 
             if batch_idx % 20 == 0:
                 if distribute_flag:
-                    print("Rank: {}".format(device), end=" ")
+                    print("Rank: {}".format(rank), end=" ")
                 print(
                     "Batch Idx: {}, Batch Loss: {:.3f}, Batch Accuracy: {:.3f}, Batch Duration: {:.3f} seconds".format(
                         batch_idx, batch_loss, batch_accuracy, batch_duration
@@ -318,7 +323,7 @@ def train_model(
 
         with open(logs_path, "at") as logs_file:
             if distribute_flag:
-                logs_file.write("Rank: {}, ".format(device))
+                logs_file.write("Rank: {}, ".format(rank))
             logs_file.write(
                 "Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}, Avg Batch Duration: {:.3f} seconds, Epoch Duration: {:.3f} seconds\n".format(
                     epoch,
@@ -329,7 +334,7 @@ def train_model(
                 )
             )
         if distribute_flag:
-            print("Rank: {}".format(device), end=" ")
+            print("Rank: {}".format(rank), end=" ")
         print(
             "Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}, Avg Batch Duration: {:.3f} seconds, Epoch Duration: {:.3f} seconds".format(
                 epoch, train_loss, train_accuracy, avg_batch_duration, epoch_duration
@@ -337,10 +342,9 @@ def train_model(
         )
         print("--------------------")
 
-        ckpt_path = "{}/Epoch_{}.pt".format(checkpoint_dir, str(epoch))
-
         if distribute_flag:
-            if device == 0:
+            if rank == 0:
+                ckpt_path = "{}/Rank_{}_Epoch_{}.pt".format(checkpoint_dir, rank, epoch)
                 torch.save(
                     {
                         "epoch": epoch,
@@ -351,6 +355,7 @@ def train_model(
                     ckpt_path,
                 )
         else:
+            ckpt_path = "{}/Epoch_{}.pt".format(checkpoint_dir, epoch)
             torch.save(
                 {
                     "epoch": epoch,
