@@ -6,10 +6,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import argparse
 import torch
 
-from functools import partial
-
-import torch.multiprocessing as mp
-
 from utils.general_utils import (
     create_helper_directories,
     distributed_setup,
@@ -25,10 +21,10 @@ torch.set_num_threads(4)
 torch.manual_seed(42)
 
 
-def main(master_ip, master_port, rank, num_nodes):
+def main(master_ip, rank, num_nodes):
     print("\n--------------------\nStarting Part Three!\n--------------------\n")
 
-    batch_size = 256
+    batch_size = 64
     learning_rate = 0.1
     momentum = 0.9
     weight_decay = 0.0001
@@ -39,42 +35,42 @@ def main(master_ip, master_port, rank, num_nodes):
     checkpoint_dir = "Checkpoints"
     logs_dir = "Logs"
 
-    distributed_setup(
-        master_ip=master_ip, master_port=master_port, rank=rank, world_size=num_nodes
-    )
+    distributed_setup(master_ip=master_ip, rank=rank, world_size=num_nodes)
 
     if torch.cuda.is_available():
+        device = torch.device("cuda")
         print("GPU available!")
     else:
+        device = torch.device("cpu")
         print("GPU not available!")
-
-    distributed_setup(
-        master_ip=master_ip, master_port=master_port, rank=rank, world_size=num_nodes
-    )
 
     model = VGG11()
 
     train_loader, test_loader = load_dataset(batch_size=batch_size)
 
     checkpoint_dir, logs_path, report_path = create_helper_directories(
-        checkpoint_dir=checkpoint_dir, logs_dir=logs_dir, task_name="", flag=False
+        checkpoint_dir=checkpoint_dir,
+        logs_dir=logs_dir,
+        task_name="PartThree",
+        sub_task_name="",
+        rank=rank,
+        flag=False,
     )
 
     model, criterion, optimizer = prepare_model_for_training(
         model=model,
-        device=rank,
+        device=device,
         learning_rate=learning_rate,
         momentum=momentum,
         weight_decay=weight_decay,
         continue_flag=continue_flag,
         continue_checkpoint_path="",
         distribute_flag=distribute_flag,
-        rank="",
     )
 
     train_model(
         model=model,
-        device=rank,
+        device=device,
         criterion=criterion,
         optimizer=optimizer,
         start_epoch=start_epoch,
@@ -83,17 +79,20 @@ def main(master_ip, master_port, rank, num_nodes):
         logs_path=logs_path,
         checkpoint_dir=checkpoint_dir,
         distribute_flag=distribute_flag,
+        rank=rank,
     )
 
-    checkpoint_path = os.path.join(checkpoint_dir, "Epoch_40.pt")
+    checkpoint_path = os.path.join(
+        checkpoint_dir, "Rank_{}_Epoch_{}.pt".format(0, end_epoch)
+    )
 
     model = prepare_model_for_evaluation(
-        model=model, device=torch.device("cpu"), checkpoint_path=checkpoint_path
+        model=model, device=device, checkpoint_path=checkpoint_path
     )
 
     evaluate_model(
         model=model,
-        device=torch.device("cpu"),
+        device=device,
         criterion=criterion,
         test_loader=test_loader,
         report_path=report_path,
@@ -115,19 +114,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     master_ip = args.master_ip
-    master_port = "1024"
     num_nodes = args.num_nodes
     rank = args.rank
 
-    mp.spawn(
-        partial(
-            main,
-            master_ip=master_ip,
-            master_port=master_port,
-            rank=rank,
-            num_nodes=num_nodes,
-        ),
-        args=(),
-        nprocs=num_nodes,
-        join=True,
-    )
+    main(master_ip=master_ip, rank=rank, num_nodes=num_nodes)
