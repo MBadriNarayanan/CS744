@@ -45,7 +45,12 @@ def main():
     train_loader, test_loader = load_dataset(batch_size=batch_size)
 
     checkpoint_dir, logs_path, report_path = create_helper_directories(
-        checkpoint_dir=checkpoint_dir, logs_dir=logs_dir, task_name="", flag=False
+        checkpoint_dir=checkpoint_dir,
+        logs_dir=logs_dir,
+        task_name="PartOne",
+        sub_task_name="",
+        rank="",
+        flag=False,
     )
 
     model, criterion, optimizer = prepare_model_for_training(
@@ -57,7 +62,6 @@ def main():
         continue_flag=continue_flag,
         continue_checkpoint_path="",
         distribute_flag=distribute_flag,
-        rank="",
     )
 
     train_model(
@@ -71,17 +75,18 @@ def main():
         logs_path=logs_path,
         checkpoint_dir=checkpoint_dir,
         distribute_flag=distribute_flag,
+        rank="",
     )
 
-    checkpoint_path = os.path.join(checkpoint_dir, "Epoch_1.pt")
+    checkpoint_path = os.path.join(checkpoint_dir, "Epoch_{}.pt".format(end_epoch))
 
     model = prepare_model_for_evaluation(
-        model=model, device=torch.device("cpu"), checkpoint_path=checkpoint_path
+        model=model, device=device, checkpoint_path=checkpoint_path
     )
 
     evaluate_model(
         model=model,
-        device=torch.device("cpu"),
+        device=device,
         criterion=criterion,
         test_loader=test_loader,
         report_path=report_path,
