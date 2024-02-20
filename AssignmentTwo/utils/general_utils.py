@@ -329,7 +329,7 @@ def train_model(
 
         train_loss = sum(train_loss_list) / len(train_loss_list)
         train_accuracy = sum(train_accuracy_list) / len(train_accuracy_list)
-        avg_batch_duration_list = avg_batch_duration_list[1:]
+        train_duration_list = train_duration_list[1:]
         avg_batch_duration = sum(train_duration_list) / len(train_duration_list)
 
         with open(logs_path, "at") as logs_file:
