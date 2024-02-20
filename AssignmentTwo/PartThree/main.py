@@ -29,7 +29,7 @@ def main(master_ip, rank, num_nodes):
     momentum = 0.9
     weight_decay = 0.0001
     start_epoch = 1
-    end_epoch = 40
+    end_epoch = 1
     continue_flag = False
     distribute_flag = True
     checkpoint_dir = "Checkpoints"
