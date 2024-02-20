@@ -49,7 +49,10 @@ def create_helper_directories(
         create_directory(directory=checkpoint_dir)
         create_directory(directory=logs_dir)
 
-    if rank != "":
+    if rank == "":
+        logs_path = os.path.join(logs_dir, "logs.txt".format(rank))
+        report_path = os.path.join(logs_dir, "report.txt".format(rank))
+    else:
         logs_path = os.path.join(logs_dir, "logs_rank{}.txt".format(rank))
         report_path = os.path.join(logs_dir, "report_rank{}.txt".format(rank))
 
@@ -306,6 +309,13 @@ def train_model(
                 )
                 print("--------------------")
 
+            if batch_idx == 40:
+                if distribute_flag:
+                    print("Rank: {}".format(rank), end=" ")
+                print("Successfully trained the model for 40 batches!")
+                print("--------------------")
+                break
+
             torch.cuda.empty_cache()
 
             del data, target
@@ -319,6 +329,7 @@ def train_model(
 
         train_loss = sum(train_loss_list) / len(train_loss_list)
         train_accuracy = sum(train_accuracy_list) / len(train_accuracy_list)
+        avg_batch_duration_list = avg_batch_duration_list[1:]
         avg_batch_duration = sum(train_duration_list) / len(train_duration_list)
 
         with open(logs_path, "at") as logs_file:
