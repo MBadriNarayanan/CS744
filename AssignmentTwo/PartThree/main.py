@@ -9,9 +9,7 @@ import torch
 from utils.general_utils import (
     create_helper_directories,
     distributed_setup,
-    evaluate_model,
-    load_dataset,
-    prepare_model_for_evaluation,
+    load_train_dataset,
     prepare_model_for_training,
     train_model,
 )
@@ -22,7 +20,7 @@ torch.manual_seed(42)
 
 
 def main(master_ip, rank, num_nodes):
-    print("\n--------------------\nStarting Part Three!\n--------------------\n")
+    print("\n--------------------\nStarting Part Three training!\n--------------------\n")
 
     batch_size = 64
     learning_rate = 0.1
@@ -46,9 +44,9 @@ def main(master_ip, rank, num_nodes):
 
     model = VGG11()
 
-    train_loader, test_loader = load_dataset(batch_size=batch_size)
+    train_loader = load_train_dataset(batch_size=batch_size)
 
-    checkpoint_dir, logs_path, report_path = create_helper_directories(
+    checkpoint_dir, logs_path, _ = create_helper_directories(
         checkpoint_dir=checkpoint_dir,
         logs_dir=logs_dir,
         task_name="PartThree",
@@ -82,24 +80,7 @@ def main(master_ip, rank, num_nodes):
         rank=rank,
     )
 
-    checkpoint_path = os.path.join(
-        checkpoint_dir, "Rank_{}_Epoch_{}.pt".format(0, end_epoch)
-    )
-
-    model = prepare_model_for_evaluation(
-        model=model, device=device, checkpoint_path=checkpoint_path
-    )
-
-    evaluate_model(
-        model=model,
-        device=device,
-        criterion=criterion,
-        test_loader=test_loader,
-        report_path=report_path,
-        checkpoint_path=checkpoint_path,
-    )
-
-    print("\n--------------------\nPart Three complete!\n--------------------\n")
+    print("\n--------------------\nPart Three training complete!\n--------------------\n")
 
 
 if __name__ == "__main__":
