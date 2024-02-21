@@ -83,7 +83,9 @@ def main():
     checkpoint_path = os.path.join(checkpoint_dir, "Epoch_{}.pt".format(end_epoch))
 
     model = prepare_model_for_evaluation(
-        model=model, device=device, checkpoint_path=checkpoint_path
+        model=model,
+        device=device,
+        checkpoint_path=checkpoint_path,
     )
 
     evaluate_model(
