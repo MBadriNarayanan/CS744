@@ -50,10 +50,11 @@ def create_helper_directories(
         create_directory(directory=logs_dir)
 
     if rank == "":
-        logs_path = os.path.join(logs_dir, "logs.txt".format(rank))
+        logs_path = os.path.join(logs_dir, "logs.txt")
+        report_path = os.path.join(logs_dir, "report.txt")
     else:
         logs_path = os.path.join(logs_dir, "logs_rank{}.txt".format(rank))
-    report_path = os.path.join(logs_dir, "report.txt".format(rank))
+        report_path = os.path.join(logs_dir, "report_rank{}.txt".format(rank))
 
     print("Checkpoints will be stored at: {}!".format(checkpoint_dir))
     print("Training logs will be stored at: {}!".format(logs_path))
@@ -358,27 +359,15 @@ def train_model(
         print("--------------------")
 
         ckpt_path = "{}/Epoch_{}.pt".format(checkpoint_dir, epoch)
-        if distribute_flag:
-            if rank == 0:
-                torch.save(
-                    {
-                        "epoch": epoch,
-                        "model_state_dict": model.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
-                        "loss": train_loss,
-                    },
-                    ckpt_path,
-                )
-        else:
-            torch.save(
-                {
-                    "epoch": epoch,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "loss": train_loss,
-                },
-                ckpt_path,
-            )
+        torch.save(
+            {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "loss": train_loss,
+            },
+            ckpt_path,
+        )
         del train_loss_list, train_accuracy_list, train_duration_list
         del train_loss, train_accuracy, avg_batch_duration
         del start_time, end_time, epoch_duration
@@ -386,7 +375,6 @@ def train_model(
     avg_epoch_duration = sum(epoch_duration_list) / len(epoch_duration_list)
     print("Avg Epoch Duration: {:.3f} seconds".format(avg_epoch_duration))
     print("--------------------")
-
-    if distribute_flag:
-        dist.destroy_process_group()
     del avg_epoch_duration, epoch_duration_list
+    if distribute_flag:
+        return model
