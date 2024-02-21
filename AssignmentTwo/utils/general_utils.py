@@ -51,10 +51,9 @@ def create_helper_directories(
 
     if rank == "":
         logs_path = os.path.join(logs_dir, "logs.txt".format(rank))
-        report_path = os.path.join(logs_dir, "report.txt".format(rank))
     else:
         logs_path = os.path.join(logs_dir, "logs_rank{}.txt".format(rank))
-        report_path = os.path.join(logs_dir, "report_rank{}.txt".format(rank))
+    report_path = os.path.join(logs_dir, "report.txt".format(rank))
 
     print("Checkpoints will be stored at: {}!".format(checkpoint_dir))
     print("Training logs will be stored at: {}!".format(logs_path))
@@ -166,17 +165,29 @@ def get_model_parameters(model):
     print("--------------------")
 
 
-def load_dataset(batch_size):
+def load_test_dataset(batch_size):
     normalize = Normalize(
         mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
         std=[x / 255.0 for x in [63.0, 62.1, 66.7]],
     )
+    transform_test = Compose([ToTensor(), normalize])
+    test_set = CIFAR10(
+        root="./data", train=False, download=True, transform=transform_test
+    )
+    test_loader = DataLoader(
+        test_set, num_workers=2, batch_size=batch_size, shuffle=False, pin_memory=True
+    )
+    return test_loader
 
+
+def load_train_dataset(batch_size):
+    normalize = Normalize(
+        mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
+        std=[x / 255.0 for x in [63.0, 62.1, 66.7]],
+    )
     transform_train = Compose(
         [RandomCrop(32, padding=4), RandomHorizontalFlip(), ToTensor(), normalize]
     )
-    transform_test = Compose([ToTensor(), normalize])
-
     training_set = CIFAR10(
         root="./data", train=True, download=True, transform=transform_train
     )
@@ -188,14 +199,7 @@ def load_dataset(batch_size):
         shuffle=True,
         pin_memory=True,
     )
-
-    test_set = CIFAR10(
-        root="./data", train=False, download=True, transform=transform_test
-    )
-    test_loader = DataLoader(
-        test_set, num_workers=2, batch_size=batch_size, shuffle=False, pin_memory=True
-    )
-    return train_loader, test_loader
+    return train_loader
 
 
 def prepare_model_for_training(
@@ -353,9 +357,9 @@ def train_model(
         )
         print("--------------------")
 
+        ckpt_path = "{}/Epoch_{}.pt".format(checkpoint_dir, epoch)
         if distribute_flag:
             if rank == 0:
-                ckpt_path = "{}/Rank_{}_Epoch_{}.pt".format(checkpoint_dir, rank, epoch)
                 torch.save(
                     {
                         "epoch": epoch,
@@ -366,7 +370,6 @@ def train_model(
                     ckpt_path,
                 )
         else:
-            ckpt_path = "{}/Epoch_{}.pt".format(checkpoint_dir, epoch)
             torch.save(
                 {
                     "epoch": epoch,
