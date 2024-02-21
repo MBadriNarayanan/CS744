@@ -8,7 +8,8 @@ import torch
 from utils.general_utils import (
     create_helper_directories,
     evaluate_model,
-    load_dataset,
+    load_test_dataset,
+    load_train_dataset,
     prepare_model_for_evaluation,
     prepare_model_for_training,
     train_model,
@@ -42,7 +43,8 @@ def main():
 
     model = VGG11()
 
-    train_loader, test_loader = load_dataset(batch_size=batch_size)
+    train_loader = load_train_dataset(batch_size=batch_size)
+    test_loader = load_test_dataset(batch_size=batch_size)
 
     checkpoint_dir, logs_path, report_path = create_helper_directories(
         checkpoint_dir=checkpoint_dir,
