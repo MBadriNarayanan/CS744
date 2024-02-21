@@ -105,7 +105,7 @@ def main(master_ip, rank, num_nodes):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Example script with argparse")
+    parser = argparse.ArgumentParser(description="Argparse for Part Three")
     parser.add_argument(
         "--master-ip", "-M", type=str, help="Master IP address", required=True
     )
