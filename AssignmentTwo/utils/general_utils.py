@@ -378,3 +378,161 @@ def train_model(
     del avg_epoch_duration, epoch_duration_list
     if distribute_flag:
         return model
+
+
+def train_model_part_two(
+    model,
+    device,
+    criterion,
+    optimizer,
+    start_epoch,
+    end_epoch,
+    train_loader,
+    logs_path,
+    checkpoint_dir,
+    rank,
+    task_flag,
+):
+    with open(logs_path, "at") as logs_file:
+        logs_file.write(
+            "Logs for the checkpoint stored at: {}/\n".format(checkpoint_dir)
+        )
+    group = dist.new_group([0, 1, 2, 3])
+    model.train()
+
+    epoch_duration_list = []
+
+    for epoch in range(start_epoch, end_epoch + 1):
+        train_loss_list = []
+        train_accuracy_list = []
+        train_duration_list = []
+
+        train_loss = 0.0
+        train_accuracy = 0.0
+        avg_batch_duration = 0.0
+
+        start_time = time.time()
+        end_time = 0.0
+        epoch_duration = 0.0
+
+        for batch_idx, (data, target) in enumerate(train_loader):
+            batch_start_time = time.time()
+            data, target = data.to(device), target.to(device)
+
+            optimizer.zero_grad()
+            y_hat = model(data)
+            loss = criterion(y_hat, target)
+            batch_loss = loss.item()
+            loss.backward()
+            if task_flag:
+                if rank == 0:
+                    for p in model.parameters():
+                        inputs = [
+                            torch.empty(p.grad.size())
+                            for _ in range(dist.get_world_size())
+                        ]
+                        dist.gather(p.grad, inputs)
+                        avg_grad = torch.mean(torch.stack(inputs), dim=0)
+                        outputs = [avg_grad for _ in range(dist.get_world_size())]
+                        dist.scatter(p.grad, outputs)
+                else:
+                    for p in model.parameters():
+                        dist.gather(p.grad)
+                        dist.scatter(p.grad)
+            else:
+                for p in model.parameters():
+                    p.grad /= 4
+                    dist.all_reduce(
+                        p.grad, op=dist.reduce_op.SUM, group=group, async_op=False
+                    )
+            optimizer.step()
+
+            y_pred = log_softmax(y_hat, dim=1)
+            y_pred = torch.argmax(y_pred, dim=1)
+            y_pred = y_pred.detach().cpu().tolist()
+            target = target.detach().cpu().tolist()
+
+            batch_end_time = time.time()
+            batch_duration = batch_end_time - batch_start_time
+
+            batch_accuracy = accuracy_score(target, y_pred)
+
+            train_loss_list.append(batch_loss)
+            train_accuracy_list.append(batch_accuracy)
+            train_duration_list.append(batch_duration)
+
+            if batch_idx % 20 == 0:
+                print(
+                    "Rank: {}, Batch Idx: {}, Batch Loss: {:.3f}, Batch Accuracy: {:.3f}, Batch Duration: {:.3f} seconds".format(
+                        rank, batch_idx, batch_loss, batch_accuracy, batch_duration
+                    )
+                )
+                print("--------------------")
+
+            if batch_idx == 40:
+                print(
+                    "Rank: {} Successfully trained the model for 40 batches!".format(
+                        rank
+                    )
+                )
+                print("--------------------")
+                break
+
+            torch.cuda.empty_cache()
+
+            del data, target
+            del y_hat, loss, y_pred
+            del batch_loss, batch_accuracy
+            del batch_start_time, batch_end_time
+
+        end_time = time.time()
+        epoch_duration = end_time - start_time
+        epoch_duration_list.append(epoch_duration)
+
+        train_loss = sum(train_loss_list) / len(train_loss_list)
+        train_accuracy = sum(train_accuracy_list) / len(train_accuracy_list)
+        train_duration_list = train_duration_list[1:]
+        avg_batch_duration = sum(train_duration_list) / len(train_duration_list)
+
+        with open(logs_path, "at") as logs_file:
+            logs_file.write(
+                "Rank: {}, Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}, Avg Batch Duration: {:.3f} seconds, Epoch Duration: {:.3f} seconds\n".format(
+                    rank,
+                    epoch,
+                    train_loss,
+                    train_accuracy,
+                    avg_batch_duration,
+                    epoch_duration,
+                )
+            )
+        print(
+            "Rank: {}, Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}, Avg Batch Duration: {:.3f} seconds, Epoch Duration: {:.3f} seconds".format(
+                rank,
+                epoch,
+                train_loss,
+                train_accuracy,
+                avg_batch_duration,
+                epoch_duration,
+            )
+        )
+        print("--------------------")
+
+        ckpt_path = "{}/Epoch_{}.pt".format(checkpoint_dir, epoch)
+        torch.save(
+            {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "loss": train_loss,
+            },
+            ckpt_path,
+        )
+        del train_loss_list, train_accuracy_list, train_duration_list
+        del train_loss, train_accuracy, avg_batch_duration
+        del start_time, end_time, epoch_duration
+
+    avg_epoch_duration = sum(epoch_duration_list) / len(epoch_duration_list)
+    print("Avg Epoch Duration: {:.3f} seconds".format(avg_epoch_duration))
+    print("--------------------")
+    del avg_epoch_duration, epoch_duration_list
+    return model
