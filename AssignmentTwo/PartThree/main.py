@@ -83,6 +83,7 @@ def main(master_ip, rank, num_nodes):
         logs_path=logs_path,
         checkpoint_dir=checkpoint_dir,
         distribute_flag=distribute_flag,
+        task_flag="",
         rank=rank,
     )
 

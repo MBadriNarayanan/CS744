@@ -77,6 +77,7 @@ def main():
         logs_path=logs_path,
         checkpoint_dir=checkpoint_dir,
         distribute_flag=distribute_flag,
+        task_flag="",
         rank="",
     )
 

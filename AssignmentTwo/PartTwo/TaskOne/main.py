@@ -16,7 +16,7 @@ from utils.general_utils import (
     load_test_dataset,
     load_train_dataset,
     prepare_model_for_training,
-    train_model_part_two,
+    train_model,
 )
 from utils.model import VGG11
 
@@ -72,7 +72,7 @@ def main(master_ip, rank, num_nodes):
         distribute_flag=distribute_flag,
     )
 
-    model = train_model_part_two(
+    model = train_model(
         model=model,
         device=device,
         criterion=criterion,
@@ -82,8 +82,9 @@ def main(master_ip, rank, num_nodes):
         train_loader=train_loader,
         logs_path=logs_path,
         checkpoint_dir=checkpoint_dir,
+        distribute_flag=distribute_flag,
+        task_flag="PartOne",
         rank=rank,
-        task_flag=True,
     )
 
     checkpoint_path = os.path.join(checkpoint_dir, "Epoch_{}.pt".format(end_epoch))
