@@ -206,6 +206,15 @@ def load_train_dataset(batch_size):
     return train_loader
 
 
+def prepare_model_for_evaluation(model, device, checkpoint_path):
+    model = model.to(device)
+    print("Loaded checkpoint:", checkpoint_path, "for evaluation!")
+    checkpoint = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    print("--------------------")
+    return model
+
+
 def prepare_model_for_training(
     model,
     device,
@@ -235,15 +244,6 @@ def prepare_model_for_training(
         print("Prepared model for training!")
     get_model_parameters(model=model)
     return model, criterion, optimizer
-
-
-def prepare_model_for_evaluation(model, device, checkpoint_path):
-    model = model.to(device)
-    print("Loaded checkpoint:", checkpoint_path, "for evaluation!")
-    checkpoint = torch.load(checkpoint_path)
-    model.load_state_dict(checkpoint["model_state_dict"])
-    print("--------------------")
-    return model
 
 
 def train_model(
