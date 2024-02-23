@@ -1,8 +1,10 @@
 # Assignment One
 
+## Page Rank: [Assignment Webiste](https://pages.cs.wisc.edu/~shivaram/cs744-sp24/assignment1.html)
+
 ## Part One: Environment Setup
 
-Using the instructions mentioned in this [website](https://pages.cs.wisc.edu/~shivaram/cs744-sp24/assignment1.html) the following tasks were completed
+Using the instructions mentioned in the assignment website the following tasks were completed
 
 * Environment Setup in CloudLab machines.
 * Installation of Apache Hadoop.
