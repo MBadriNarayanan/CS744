@@ -22,7 +22,7 @@
         "taskName": "BaseModel"
     },
     "Train": {
-        "batchSize": 32,
+        "batchSize": 8,
         "startEpoch": 1,
         "endEpoch": 5,
         "learningRate": 5e-5,
