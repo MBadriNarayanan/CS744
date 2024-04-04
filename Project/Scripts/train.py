@@ -12,6 +12,7 @@ from utils import (
     train_model,
 )
 
+
 def main(config):
     if config["Framework"]["modelFramework"]:
         print("Using Megatron LM for Model finetuning!")
@@ -94,6 +95,7 @@ def main(config):
         logs_path=logs_path,
         checkpoint_dir=checkpoint_dir,
     )
+
 
 if __name__ == "__main__":
     print("\n--------------------\nStarting model training!\n--------------------\n")
