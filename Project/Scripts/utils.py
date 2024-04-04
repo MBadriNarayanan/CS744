@@ -139,7 +139,7 @@ def evaluate_model(
 
     model.eval()
     with torch.no_grad():
-        for batch_idx, test_batch in tqdm(enumerate(test_loader)):
+        for test_batch in tqdm(test_loader):
             input_ids = test_batch[0].view(batch_size, -1).to(device)
             attention_mask = test_batch[1].view(batch_size, -1).to(device)
             labels = test_batch[2].view(batch_size, -1).to(device)
@@ -151,7 +151,7 @@ def evaluate_model(
 
             y_pred = torch.argmax(logits, dim=1)
             y_pred = y_pred.cpu().tolist()
-            target = labels.cpu().tolist()
+            target = labels.cpu().numpy().reshape(batch_size).tolist()
 
             test_loss += batch_loss
             ground_truth += target
@@ -308,7 +308,7 @@ def train_model(
         train_loss = 0.0
         train_accuracy = 0.0
 
-        for batch_idx, train_batch in enumerate(train_loader):
+        for train_batch in train_loader:
             input_ids = train_batch[0].view(batch_size, -1).to(device)
             attention_mask = train_batch[1].view(batch_size, -1).to(device)
             labels = train_batch[2].view(batch_size, -1).to(device)
@@ -327,7 +327,7 @@ def train_model(
 
             y_pred = torch.argmax(logits, dim=1)
             y_pred = y_pred.cpu().numpy()
-            target = labels.cpu().numpy()
+            target = labels.cpu().numpy().reshape(batch_size)
             batch_accuracy = accuracy_score(target, y_pred)
 
             train_loss += batch_loss
@@ -348,7 +348,7 @@ def train_model(
 
         model.eval()
         with torch.no_grad():
-            for batch_idx, val_batch in enumerate(val_loader):
+            for val_batch in val_loader:
                 input_ids = val_batch[0].view(batch_size, -1).to(device)
                 attention_mask = val_batch[1].view(batch_size, -1).to(device)
                 labels = val_batch[2].view(batch_size, -1).to(device)
@@ -360,7 +360,7 @@ def train_model(
 
                 y_pred = torch.argmax(logits, dim=1)
                 y_pred = y_pred.cpu().numpy()
-                target = labels.cpu().numpy()
+                target = labels.cpu().numpy().reshape(batch_size)
                 batch_accuracy = accuracy_score(target, y_pred)
 
                 val_loss += batch_loss
