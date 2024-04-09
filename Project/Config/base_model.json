@@ -4,7 +4,7 @@
     },
     "Model": {
         "modelName": "bert-base-uncased",
-        "sequenceLength": 512,
+        "sequenceLength": 128,
         "paddingValue": "max_length",
         "truncationFlag": true,
         "returnTensors": "pt",
