@@ -189,7 +189,9 @@ def evaluate_model(
         report_path=report_path,
         checkpoint_path=checkpoint_path,
     )
-    del test_loss
+    del avg_batch_duration
+    del test_loss, test_duration
+    del ground_truth, prediction
 
 
 def get_model_parameters(model):
@@ -315,7 +317,8 @@ def train_model(
             "Logs for the checkpoint stored at: {}/\n".format(checkpoint_dir)
         )
 
-    total_steps = len(train_loader) * (end_epoch - start_epoch + 1)
+    number_of_epochs = end_epoch - start_epoch + 1
+    total_steps = len(train_loader) * number_of_epochs
     training_scheduler = get_linear_schedule_with_warmup(
         optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps
     )
@@ -323,10 +326,12 @@ def train_model(
     avg_train_loss = 0.0
     avg_train_accuracy = 0.0
     avg_train_duration = 0.0
+    avg_train_batch_time = 0.0
 
     avg_val_loss = 0.0
     avg_val_accuracy = 0.0
     avg_val_duration = 0.0
+    avg_val_batch_time = 0.0
 
     for epoch in tqdm(range(start_epoch, end_epoch + 1)):
         model.train()
@@ -369,12 +374,12 @@ def train_model(
             avg_train_batch_duration += batch_duration
 
             if batch_idx % 100 == 0:
+                write_string = "Epoch: {}, Train Batch Idx: {}, Train Batch Loss: {:.3f}, Train Batch Accuracy: {:.3f}, Train Batch Duration: {:.3f} seconds\n".format(
+                    epoch, batch_idx, batch_loss, batch_accuracy, batch_duration
+                )
                 with open(logs_path, "at") as logs_file:
-                    logs_file.write(
-                        "Epoch: {}, Train Batch Idx: {}, Train Batch Loss: {:.3f}, Train Batch Accuracy: {:.3f}, Train Batch Duration: {:.3f} seconds\n".format(
-                            epoch, batch_idx, batch_loss, batch_accuracy, batch_duration
-                        )
-                    )
+                    logs_file.write(write_string)
+                del write_string
 
             torch.cuda.empty_cache()
 
@@ -395,6 +400,7 @@ def train_model(
         avg_train_loss += epoch_train_loss
         avg_train_accuracy += epoch_train_accuracy
         avg_train_duration += epoch_train_duration
+        avg_train_batch_time += avg_train_batch_duration
 
         epoch_val_loss = 0.0
         epoch_val_accuracy = 0.0
@@ -430,12 +436,12 @@ def train_model(
                 avg_val_batch_duration += batch_duration
 
                 if batch_idx % 100 == 0:
+                    write_string = "Epoch: {}, Val Batch Idx: {}, Val Batch Loss: {:.3f}, Val Batch Accuracy: {:.3f}, Val Batch Duration: {:.3f} seconds\n".format(
+                        epoch, batch_idx, batch_loss, batch_accuracy, batch_duration
+                    )
                     with open(logs_path, "at") as logs_file:
-                        logs_file.write(
-                            "Epoch: {}, Val Batch Idx: {}, Val Batch Loss: {:.3f}, Val Batch Accuracy: {:.3f}, Val Batch Duration: {:.3f} seconds\n".format(
-                                epoch, batch_idx, batch_loss, batch_accuracy, batch_duration
-                            )
-                        )
+                        logs_file.write(write_string)
+                    del write_string
 
                 del input_ids, attention_mask, labels
                 del output, loss, logits
@@ -454,22 +460,23 @@ def train_model(
         avg_val_loss += epoch_val_loss
         avg_val_accuracy += epoch_val_accuracy
         avg_val_duration += epoch_val_duration
+        avg_val_batch_time += avg_val_batch_duration
 
+        write_string = "Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}, Train Duration: {:.3f} seconds, Avg Train Batch Duration: {:.3f} seconds, Val Loss: {:.3f}, Val Accuracy: {:.3f}, Val Duration: {:.3f} seconds, Avg Val Batch Duration: {:.3f} seconds\n".format(
+            epoch,
+            epoch_train_loss,
+            epoch_train_accuracy,
+            epoch_train_duration,
+            avg_train_batch_duration,
+            epoch_val_loss,
+            epoch_val_accuracy,
+            epoch_val_duration,
+            avg_val_batch_duration,
+        )
         with open(logs_path, "at") as logs_file:
-            logs_file.write(
-                "Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}, Train Duration: {:.3f} seconds, Avg Train Batch Duration: {:.3f} seconds, Val Loss: {:.3f}, Val Accuracy: {:.3f}, Val Duration: {:.3f} seconds, Avg Val Batch Duration: {:.3f} seconds\n".format(
-                    epoch,
-                    epoch_train_loss,
-                    epoch_train_accuracy,
-                    epoch_train_duration,
-                    avg_train_batch_duration,
-                    epoch_val_loss,
-                    epoch_val_accuracy,
-                    epoch_val_duration,
-                    avg_val_batch_duration,
-                )
-            )
+            logs_file.write(write_string)
             logs_file.write("----------------------------------------------\n")
+        del write_string
 
         ckpt_path = "{}/Epoch_{}.pt".format(checkpoint_dir, epoch)
         torch.save(
@@ -477,30 +484,44 @@ def train_model(
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
-                "loss": train_loss,
+                "loss": epoch_train_loss,
             },
             ckpt_path,
         )
-        del train_loss, train_accuracy
-        del val_loss, val_accuracy
 
-    number_of_epochs = end_epoch - start_epoch + 1
+        del epoch_train_loss, epoch_train_accuracy
+        del epoch_train_duration, avg_train_batch_duration
+        del train_epoch_start_time, train_epoch_end_time
+
+        del epoch_val_loss, epoch_val_accuracy
+        del epoch_val_duration, avg_val_batch_duration
+        del val_epoch_start_time, val_epoch_end_time
+
     avg_train_loss /= number_of_epochs
     avg_train_accuracy /= number_of_epochs
     avg_train_duration /= number_of_epochs
+    avg_train_batch_time /= number_of_epochs
     avg_val_loss /= number_of_epochs
     avg_val_accuracy /= number_of_epochs
     avg_val_duration /= number_of_epochs
+    avg_val_batch_time /= number_of_epochs
 
+    write_string = "Avg Train Loss: {:.3f}, Avg Train Accuracy: {:.3f}, Avg Train Duration: {:.3f} seconds, Avg Train Batch Duration: {:.3f} seconds, Avg Val Loss: {:.3f}, Avg Val Accuracy: {:.3f}, Avg Val Duration: {:.3f} seconds, Avg Val Batch Duration: {:.3f} seconds,\n".format(
+        avg_train_loss,
+        avg_train_accuracy,
+        avg_train_duration,
+        avg_train_batch_time,
+        avg_val_loss,
+        avg_val_accuracy,
+        avg_val_duration,
+        avg_val_batch_time,
+    )
     with open(logs_path, "at") as logs_file:
-        logs_file.write(
-            "Avg Train Loss: {:.3f}, Avg Train Accuracy: {:.3f}, Avg Train Duration: {:.3f} seconds, Avg Val Loss: {:.3f}, Avg Val Accuracy: {:.3f}, Avg Val Duration: {:.3f} seconds\n".format(
-                avg_train_loss,
-                avg_train_accuracy,
-                avg_train_duration,
-                avg_val_loss,
-                avg_val_accuracy,
-                avg_val_duration,
-            )
-        )
+        logs_file.write(write_string)
         logs_file.write("----------------------------------------------\n")
+    del write_string
+
+    del avg_train_loss, avg_train_accuracy
+    del avg_train_duration, avg_train_batch_time
+    del avg_val_loss, avg_val_accuracy
+    del avg_val_duration, avg_val_batch_time

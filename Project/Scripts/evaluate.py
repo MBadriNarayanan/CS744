@@ -37,7 +37,10 @@ def main(config):
     checkpoint_path = config["Eval"]["checkpointPath"]
 
     report_path = create_helper_directories(
-        checkpoint_dir=checkpoint_dir, logs_dir=logs_dir, task_name=task_name, flag=False
+        checkpoint_dir=checkpoint_dir,
+        logs_dir=logs_dir,
+        task_name=task_name,
+        flag=False,
     )
 
     if torch.cuda.is_available():
@@ -49,6 +52,8 @@ def main(config):
     else:
         device = torch.device("cpu")
         print("GPU not available, using CPU!")
+    
+    torch.cuda.empty_cache()
 
     model, tokenizer = prepare_base_model(
         model_name=model_name, label_count=label_count
@@ -69,7 +74,9 @@ def main(config):
         shuffle_flag=shuffle_flag,
     )
 
-    model = prepare_model_for_evaluation(model=model, device=device, checkpoint_path=checkpoint_path)
+    model = prepare_model_for_evaluation(
+        model=model, device=device, checkpoint_path=checkpoint_path
+    )
 
     evaluate_model(
         model=model,
@@ -86,7 +93,11 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Argparse for Model evaluation")
     parser.add_argument(
-        "--config", "-C", type=str, help="Config file for model evaluation", required=True
+        "--config",
+        "-C",
+        type=str,
+        help="Config file for model evaluation",
+        required=True,
     )
     args = parser.parse_args()
 
