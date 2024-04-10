@@ -63,7 +63,7 @@ def main(config):
     test_data = dataset["test"]
 
     test_loader = generate_test_loader(
-        train_data=test_data,
+        test_data=test_data,
         tokenizer=tokenizer,
         max_length=max_length,
         padding_value=padding_value,
