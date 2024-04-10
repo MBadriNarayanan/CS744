@@ -4,7 +4,7 @@
     },
     "Model": {
         "modelName": "bert-base-uncased",
-        "sequenceLength": 128,
+        "sequenceLength": 512,
         "paddingValue": "max_length",
         "truncationFlag": true,
         "returnTensors": "pt",
@@ -22,9 +22,9 @@
         "taskName": "BaseModel"
     },
     "Train": {
-        "batchSize": 32,
+        "batchSize": 16,
         "startEpoch": 1,
-        "endEpoch": 3,
+        "endEpoch": 5,
         "learningRate": 5e-5,
         "continueFlag": false,
         "continueCheckpoint": ""
@@ -32,6 +32,6 @@
     },
     "Eval": {
         "batchSize": 16,
-        "checkpointPath": "Checkpoints/BaseModel/Epoch_3.pt"
+        "checkpointPath": "Checkpoints/BaseModel/Epoch_5.pt"
     }
 }
