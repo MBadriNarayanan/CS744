@@ -6,7 +6,7 @@ import torch
 from datasets import load_dataset
 from utils import (
     create_helper_directories,
-    generate_test_loader,
+    generate_data_loader,
     prepare_base_model,
     prepare_model_for_evaluation,
     evaluate_model,
@@ -36,7 +36,12 @@ def main(config):
     batch_size = config["Eval"]["batchSize"]
     checkpoint_path = config["Eval"]["checkpointPath"]
 
-    report_path = create_helper_directories(
+    (
+        val_csv_path,
+        val_report_path,
+        test_csv_path,
+        test_report_path,
+    ) = create_helper_directories(
         checkpoint_dir=checkpoint_dir,
         logs_dir=logs_dir,
         task_name=task_name,
@@ -60,10 +65,22 @@ def main(config):
     )
     dataset = load_dataset(dataset_class, dataset_name)
 
-    test_data = dataset["test"]
+    val_data = dataset["validation"]
+    val_loader = generate_data_loader(
+        data=val_data,
+        tokenizer=tokenizer,
+        max_length=max_length,
+        padding_value=padding_value,
+        truncation_flag=truncation_flag,
+        return_tensors=return_tensors,
+        special_token_flag=special_token_flag,
+        batch_size=batch_size,
+        shuffle_flag=shuffle_flag,
+    )
 
-    test_loader = generate_test_loader(
-        test_data=test_data,
+    test_data = dataset["test"]
+    test_loader = generate_data_loader(
+        data=test_data,
         tokenizer=tokenizer,
         max_length=max_length,
         padding_value=padding_value,
@@ -75,15 +92,29 @@ def main(config):
     )
 
     model = prepare_model_for_evaluation(
-        model=model, device=device, checkpoint_path=checkpoint_path
+        model=model, device=device, checkpoint_path=checkpoint_path, flag="validation"
     )
-
     evaluate_model(
         model=model,
         device=device,
-        test_loader=test_loader,
-        report_path=report_path,
+        data_loader=val_loader,
+        report_path=val_report_path,
+        csv_path=val_csv_path,
         checkpoint_path=checkpoint_path,
+        flag="validation",
+    )
+
+    model = prepare_model_for_evaluation(
+        model=model, device=device, checkpoint_path=checkpoint_path, flag="testing"
+    )
+    evaluate_model(
+        model=model,
+        device=device,
+        data_loader=test_loader,
+        report_path=test_report_path,
+        csv_path=test_csv_path,
+        checkpoint_path=checkpoint_path,
+        flag="testing",
     )
 
 
