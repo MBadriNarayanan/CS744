@@ -143,9 +143,13 @@ def evaluate_model(
     model.eval()
     with torch.no_grad():
         for test_batch in tqdm(test_loader):
-            input_ids = test_batch[0].view(input_ids.size(0), -1).to(device)
-            attention_mask = test_batch[1].view(attention_mask.size(0), -1).to(device)
-            labels = test_batch[2].view(labels.size(0), -1).to(device)
+            input_ids = test_batch[0]
+            attention_mask = test_batch[1]
+            labels = test_batch[2]
+
+            input_ids = input_ids.view(input_ids.size(0), -1).to(device)
+            attention_mask = attention_mask.view(attention_mask.size(0), -1).to(device)
+            labels = labels.view(labels.size(0), -1).to(device)
 
             batch_start_time = time.time()
 
@@ -342,9 +346,13 @@ def train_model(
         train_epoch_start_time = time.time()
 
         for batch_idx, train_batch in enumerate(train_loader):
-            input_ids = train_batch[0].view(input_ids.size(0), -1).to(device)
-            attention_mask = train_batch[1].view(attention_mask.size(0), -1).to(device)
-            labels = train_batch[2].view(labels.size(0), -1).to(device)
+            input_ids = train_batch[0]
+            attention_mask = train_batch[1]
+            labels = train_batch[2]
+
+            input_ids = input_ids.view(input_ids.size(0), -1).to(device)
+            attention_mask = attention_mask.view(attention_mask.size(0), -1).to(device)
+            labels = labels.view(labels.size(0), -1).to(device)
 
             batch_start_time = time.time()
 
@@ -410,11 +418,15 @@ def train_model(
         model.eval()
         with torch.no_grad():
             for batch_idx, val_batch in enumerate(val_loader):
-                input_ids = val_batch[0].view(input_ids.size(0), -1).to(device)
-                attention_mask = (
-                    val_batch[1].view(attention_mask.size(0), -1).to(device)
+                input_ids = val_batch[0]
+                attention_mask = val_batch[1]
+                labels = val_batch[2]
+
+                input_ids = input_ids.view(input_ids.size(0), -1).to(device)
+                attention_mask = attention_mask.view(attention_mask.size(0), -1).to(
+                    device
                 )
-                labels = val_batch[2].view(labels.size(0), -1).to(device)
+                labels = labels.view(labels.size(0), -1).to(device)
 
                 batch_start_time = time.time()
 
