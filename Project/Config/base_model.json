@@ -32,6 +32,6 @@
     },
     "Eval": {
         "batchSize": 16,
-        "checkpointPath": "Checkpoints/Epoch_3.pt"
+        "checkpointPath": "Checkpoints/BaseModel/Epoch_3.pt"
     }
 }
