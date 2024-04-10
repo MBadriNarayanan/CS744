@@ -52,7 +52,7 @@ def main(config):
     else:
         device = torch.device("cpu")
         print("GPU not available, using CPU!")
-    
+
     torch.cuda.empty_cache()
 
     model, tokenizer = prepare_base_model(
@@ -82,7 +82,6 @@ def main(config):
         model=model,
         device=device,
         test_loader=test_loader,
-        batch_size=batch_size,
         report_path=report_path,
         checkpoint_path=checkpoint_path,
     )

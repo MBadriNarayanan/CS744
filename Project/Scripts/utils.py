@@ -128,7 +128,6 @@ def evaluate_model(
     model,
     device,
     test_loader,
-    batch_size,
     report_path,
     checkpoint_path,
 ):
@@ -144,9 +143,9 @@ def evaluate_model(
     model.eval()
     with torch.no_grad():
         for test_batch in tqdm(test_loader):
-            input_ids = test_batch[0].view(batch_size, -1).to(device)
-            attention_mask = test_batch[1].view(batch_size, -1).to(device)
-            labels = test_batch[2].view(batch_size, -1).to(device)
+            input_ids = test_batch[0].view(input_ids.size(0), -1).to(device)
+            attention_mask = test_batch[1].view(attention_mask.size(0), -1).to(device)
+            labels = test_batch[2].view(labels.size(0), -1).to(device)
 
             batch_start_time = time.time()
 
@@ -157,7 +156,7 @@ def evaluate_model(
 
             y_pred = torch.argmax(logits, dim=1)
             y_pred = y_pred.cpu().tolist()
-            target = labels.cpu().numpy().reshape(batch_size).tolist()
+            target = labels.cpu().numpy().reshape(labels.shape[0]).tolist()
 
             test_loss += batch_loss
             ground_truth += target
@@ -308,7 +307,6 @@ def train_model(
     end_epoch,
     train_loader,
     val_loader,
-    batch_size,
     logs_path,
     checkpoint_dir,
 ):
@@ -344,9 +342,9 @@ def train_model(
         train_epoch_start_time = time.time()
 
         for batch_idx, train_batch in enumerate(train_loader):
-            input_ids = train_batch[0].view(batch_size, -1).to(device)
-            attention_mask = train_batch[1].view(batch_size, -1).to(device)
-            labels = train_batch[2].view(batch_size, -1).to(device)
+            input_ids = train_batch[0].view(input_ids.size(0), -1).to(device)
+            attention_mask = train_batch[1].view(attention_mask.size(0), -1).to(device)
+            labels = train_batch[2].view(labels.size(0), -1).to(device)
 
             batch_start_time = time.time()
 
@@ -363,7 +361,7 @@ def train_model(
 
             y_pred = torch.argmax(logits, dim=1)
             y_pred = y_pred.cpu().numpy()
-            target = labels.cpu().numpy().reshape(batch_size)
+            target = labels.cpu().numpy().reshape(labels.shape[0])
             batch_accuracy = accuracy_score(target, y_pred)
 
             epoch_train_loss += batch_loss
@@ -412,9 +410,11 @@ def train_model(
         model.eval()
         with torch.no_grad():
             for batch_idx, val_batch in enumerate(val_loader):
-                input_ids = val_batch[0].view(batch_size, -1).to(device)
-                attention_mask = val_batch[1].view(batch_size, -1).to(device)
-                labels = val_batch[2].view(batch_size, -1).to(device)
+                input_ids = val_batch[0].view(input_ids.size(0), -1).to(device)
+                attention_mask = (
+                    val_batch[1].view(attention_mask.size(0), -1).to(device)
+                )
+                labels = val_batch[2].view(labels.size(0), -1).to(device)
 
                 batch_start_time = time.time()
 
@@ -425,7 +425,7 @@ def train_model(
 
                 y_pred = torch.argmax(logits, dim=1)
                 y_pred = y_pred.cpu().numpy()
-                target = labels.cpu().numpy().reshape(batch_size)
+                target = labels.cpu().numpy().reshape(labels.shape[0])
                 batch_accuracy = accuracy_score(target, y_pred)
 
                 epoch_val_loss += batch_loss

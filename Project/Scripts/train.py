@@ -93,7 +93,6 @@ def main(config):
         end_epoch=end_epoch,
         train_loader=train_loader,
         val_loader=val_loader,
-        batch_size=batch_size,
         logs_path=logs_path,
         checkpoint_dir=checkpoint_dir,
     )
