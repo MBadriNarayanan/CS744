@@ -6,7 +6,7 @@ import torch
 from datasets import load_dataset
 from utils import (
     create_helper_directories,
-    generate_train_val_loader,
+    generate_data_loader,
     prepare_base_model,
     prepare_model_for_training,
     train_model,
@@ -62,11 +62,8 @@ def main(config):
     dataset = load_dataset(dataset_class, dataset_name)
 
     train_data = dataset["train"]
-    val_data = dataset["validation"]
-
-    train_loader, val_loader = generate_train_val_loader(
-        train_data=train_data,
-        val_data=val_data,
+    train_loader = generate_data_loader(
+        data=train_data,
         tokenizer=tokenizer,
         max_length=max_length,
         padding_value=padding_value,
@@ -84,15 +81,13 @@ def main(config):
         continue_flag=continue_flag,
         continue_checkpoint_path=continue_checkpoint_path,
     )
-
     train_model(
         model=model,
         device=device,
         optimizer=optimizer,
         start_epoch=start_epoch,
         end_epoch=end_epoch,
-        train_loader=train_loader,
-        val_loader=val_loader,
+        data_loader=train_loader,
         logs_path=logs_path,
         checkpoint_dir=checkpoint_dir,
     )
