@@ -285,7 +285,7 @@ def prepare_base_model(model_name, label_count):
 
 def prepare_model_for_evaluation(model, device, checkpoint_path, flag="validation"):
     model = model.to(device)
-    print("Loaded checkpoint:", checkpoint_path, "for evaluation!")
+    print("Loaded checkpoint: {} for {}!".format(checkpoint_path, flag))
     checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint["model_state_dict"])
     print("--------------------")
