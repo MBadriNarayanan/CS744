@@ -5,9 +5,11 @@ import torch.cuda
 import warnings
 
 import numpy as np
+import pandas as pd
 
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from torch.optim import AdamW
+from torch.nn.functional import log_softmax
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
@@ -57,7 +59,8 @@ class GlueDataset(Dataset):
         input_ids = torch.tensor(tokenized_data["input_ids"])
         attention_mask = torch.tensor(tokenized_data["attention_mask"])
         label = torch.tensor(self.data[idx]["label"])
-        return (input_ids, attention_mask, label)
+        sentence = self.data[idx]["sentence"]
+        return (input_ids, attention_mask, label, sentence)
 
 
 def create_directory(directory):
@@ -83,118 +86,22 @@ def create_helper_directories(checkpoint_dir, logs_dir, task_name, flag=True):
         print("Training logs will be stored at: {}!".format(logs_path))
         return checkpoint_dir, logs_path
     else:
-        report_path = os.path.join(logs_dir, "report.txt")
-        print("Evaluation report will be stored at: {}!".format(report_path))
-        return report_path
+        validation_logs_dir = os.path.join(logs_dir, "Validation")
+        create_directory(directory=validation_logs_dir)
 
+        test_logs_dir = os.path.join(logs_dir, "Test")
+        create_directory(directory=test_logs_dir)
 
-def generate_eval_report(
-    ground_truth,
-    prediction,
-    test_loss,
-    avg_batch_duration,
-    test_duration,
-    report_path,
-    checkpoint_path,
-):
-    test_accuracy = accuracy_score(ground_truth, prediction)
-    report = classification_report(
-        ground_truth,
-        prediction,
-        digits=3,
-        zero_division=0,
-    )
+        val_csv_path = os.path.join(validation_logs_dir, "output.csv")
+        test_csv_path = os.path.join(test_logs_dir, "output.csv")
 
-    matrix = confusion_matrix(ground_truth, prediction)
+        val_report_path = os.path.join(validation_logs_dir, "report.txt")
+        test_report_path = os.path.join(test_logs_dir, "report.txt")
 
-    with open(report_path, "w") as report_file:
-        report_file.write("Metrics for the checkpoint: {}\n".format(checkpoint_path))
-        report_file.write(
-            "Test Loss: {:.3f}, Test Accuracy: {:.3f}, Avg Batch Duration: {:.3f} seconds, Test Duration: {:.3f} seconds\n".format(
-                test_loss, test_accuracy, avg_batch_duration, test_duration
-            )
-        )
-        report_file.write("Classification Report\n")
-        report_file.write("{}\n".format(report))
-        report_file.write("Confusion Matrix\n")
-        report_file.write("{}\n".format(matrix))
-        report_file.write("--------------------\n")
+        print("Validation reports will be stored at: {}!".format(validation_logs_dir))
+        print("Test reports will be stored at: {}!".format(test_logs_dir))
 
-    del ground_truth, prediction
-    del test_accuracy, report
-
-
-def evaluate_model(
-    model,
-    device,
-    test_loader,
-    report_path,
-    checkpoint_path,
-):
-    ground_truth = []
-    prediction = []
-
-    test_loss = 0.0
-    test_duration = 0.0
-    avg_batch_duration = 0.0
-
-    test_start_time = time.time()
-
-    model.eval()
-    with torch.no_grad():
-        for test_batch in tqdm(test_loader):
-            input_ids = test_batch[0]
-            attention_mask = test_batch[1]
-            labels = test_batch[2]
-
-            input_ids = input_ids.view(input_ids.size(0), -1).to(device)
-            attention_mask = attention_mask.view(attention_mask.size(0), -1).to(device)
-            labels = labels.view(labels.size(0), -1).to(device)
-
-            batch_start_time = time.time()
-
-            output = model(input_ids, attention_mask=attention_mask, labels=labels)
-            loss = output.loss
-            logits = output.logits
-            batch_loss = loss.item()
-
-            y_pred = torch.argmax(logits, dim=1)
-            y_pred = y_pred.cpu().tolist()
-            target = labels.cpu().numpy().reshape(labels.shape[0]).tolist()
-
-            test_loss += batch_loss
-            ground_truth += target
-            prediction += y_pred
-
-            batch_end_time = time.time()
-            batch_duration = batch_end_time - batch_start_time
-            avg_batch_duration += batch_duration
-
-            del input_ids, attention_mask, labels
-            del output, loss, logits
-            del target, y_pred
-            del batch_loss
-            del batch_start_time, batch_end_time
-            del batch_duration
-
-    test_loss /= len(test_loader)
-    avg_batch_duration /= len(test_loader)
-
-    test_end_time = time.time()
-    test_duration = test_end_time - test_start_time
-
-    generate_eval_report(
-        ground_truth=ground_truth,
-        prediction=prediction,
-        test_loss=test_loss,
-        avg_batch_duration=avg_batch_duration,
-        test_duration=test_duration,
-        report_path=report_path,
-        checkpoint_path=checkpoint_path,
-    )
-    del avg_batch_duration
-    del test_loss, test_duration
-    del ground_truth, prediction
+        return val_csv_path, val_report_path, test_csv_path, test_report_path
 
 
 def get_model_parameters(model):
@@ -204,8 +111,8 @@ def get_model_parameters(model):
     print("--------------------")
 
 
-def generate_test_loader(
-    test_data,
+def generate_data_loader(
+    data,
     tokenizer,
     max_length,
     padding_value,
@@ -215,8 +122,8 @@ def generate_test_loader(
     batch_size,
     shuffle_flag,
 ):
-    test_data = GlueDataset(
-        data=test_data,
+    data = GlueDataset(
+        data=data,
         tokenizer=tokenizer,
         max_length=max_length,
         padding_value=padding_value,
@@ -224,45 +131,148 @@ def generate_test_loader(
         return_tensors=return_tensors,
         special_token_flag=special_token_flag,
     )
-    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=shuffle_flag)
-    return test_loader
+    data_loader = DataLoader(data, batch_size=batch_size, shuffle=shuffle_flag)
+    return data_loader
 
 
-def generate_train_val_loader(
-    train_data,
-    val_data,
-    tokenizer,
-    max_length,
-    padding_value,
-    truncation_flag,
-    return_tensors,
-    special_token_flag,
-    batch_size,
-    shuffle_flag,
+def generate_report(
+    ground_truth,
+    prediction,
+    loss,
+    avg_batch_duration,
+    duration,
+    report_path,
+    checkpoint_path,
 ):
-    train_data = GlueDataset(
-        data=train_data,
-        tokenizer=tokenizer,
-        max_length=max_length,
-        padding_value=padding_value,
-        truncation_flag=truncation_flag,
-        return_tensors=return_tensors,
-        special_token_flag=special_token_flag,
+    accuracy = accuracy_score(ground_truth, prediction)
+    report = classification_report(
+        ground_truth,
+        prediction,
+        digits=3,
+        zero_division=0,
+        target_names=["negative", "positive"],
     )
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=shuffle_flag)
+    matrix = confusion_matrix(ground_truth, prediction)
 
-    val_data = GlueDataset(
-        data=val_data,
-        tokenizer=tokenizer,
-        max_length=max_length,
-        padding_value=padding_value,
-        truncation_flag=truncation_flag,
-        return_tensors=return_tensors,
-        special_token_flag=special_token_flag,
-    )
-    val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=shuffle_flag)
+    with open(report_path, "w") as report_file:
+        report_file.write(
+            "Validation Metrics for the checkpoint: {}\n".format(checkpoint_path)
+        )
+        report_file.write(
+            "Loss: {:.3f}, Accuracy: {:.3f}, Avg Batch Duration: {:.3f} seconds, Duration: {:.3f} seconds\n".format(
+                loss, accuracy, avg_batch_duration, duration
+            )
+        )
+        report_file.write("Classification Report\n")
+        report_file.write("{}\n".format(report))
+        report_file.write("Confusion Matrix\n")
+        report_file.write("{}\n".format(matrix))
+        report_file.write("--------------------\n")
 
-    return train_loader, val_loader
+    del ground_truth, prediction
+    del accuracy, report
+
+
+def evaluate_model(
+    model,
+    device,
+    data_loader,
+    report_path,
+    csv_path,
+    checkpoint_path,
+    flag="validation",
+):
+    sentence_data = []
+    prediction = []
+
+    evaluation_duration = 0.0
+    avg_batch_duration = 0.0
+
+    if flag == "validation":
+        ground_truth = []
+        val_loss = 0.0
+
+    start_time = time.time()
+    model.eval()
+    with torch.no_grad():
+        for data_batch in tqdm(data_loader):
+            input_ids = data_batch[0]
+            attention_mask = data_batch[1]
+            labels = data_batch[2]
+            sentence = data_batch[3]
+
+            input_ids = input_ids.view(input_ids.size(0), -1).to(device)
+            attention_mask = attention_mask.view(attention_mask.size(0), -1).to(device)
+            labels = labels.view(labels.size(0), -1).to(device)
+            sentence = list(sentence)
+
+            batch_start_time = time.time()
+
+            if flag == "validation":
+                output = model(input_ids, attention_mask=attention_mask, labels=labels)
+                loss = output.loss
+                logits = output.logits
+                batch_loss = loss.item()
+
+            else:
+                output = model(input_ids, attention_mask=attention_mask)
+                logits = output.logits
+
+            y_pred = log_softmax(logits, dim=1)
+            y_pred = torch.argmax(y_pred, dim=1)
+            y_pred = y_pred.cpu().tolist()
+
+            if flag == "validation":
+                target = labels.cpu().numpy().reshape(labels.shape[0]).tolist()
+                val_loss += batch_loss
+                ground_truth += target
+
+            prediction += y_pred
+            sentence_data += sentence
+
+            batch_end_time = time.time()
+            avg_batch_duration += batch_end_time - batch_start_time
+
+            del input_ids, attention_mask, labels
+            del batch_start_time, batch_end_time
+            del output, logits
+            del y_pred, sentence
+
+            if flag == "validation":
+                del loss, target
+                del batch_loss
+
+    avg_batch_duration /= len(data_loader)
+
+    end_time = time.time()
+    evaluation_duration = end_time - start_time
+
+    dataframe = pd.DataFrame()
+    dataframe["Sentence"] = sentence_data
+    dataframe["Prediction"] = prediction
+
+    if flag == "validation":
+        val_loss /= len(data_loader)
+        generate_report(
+            ground_truth=ground_truth,
+            prediction=prediction,
+            loss=val_loss,
+            avg_batch_duration=avg_batch_duration,
+            duration=evaluation_duration,
+            report_path=report_path,
+            checkpoint_path=checkpoint_path,
+        )
+        dataframe["GroundTruth"] = ground_truth
+        dataframe = dataframe[["Sentence", "GroundTruth", "Prediction"]]
+        del val_loss
+        del ground_truth
+
+    dataframe.to_csv(csv_path, index=False)
+
+    del avg_batch_duration
+    del evaluation_duration
+    del prediction, sentence_data
+    del dataframe
 
 
 def prepare_base_model(model_name, label_count):
@@ -273,7 +283,7 @@ def prepare_base_model(model_name, label_count):
     return model, tokenizer
 
 
-def prepare_model_for_evaluation(model, device, checkpoint_path):
+def prepare_model_for_evaluation(model, device, checkpoint_path, flag="validation"):
     model = model.to(device)
     print("Loaded checkpoint:", checkpoint_path, "for evaluation!")
     checkpoint = torch.load(checkpoint_path)
@@ -309,8 +319,7 @@ def train_model(
     optimizer,
     start_epoch,
     end_epoch,
-    train_loader,
-    val_loader,
+    data_loader,
     logs_path,
     checkpoint_dir,
 ):
@@ -320,7 +329,7 @@ def train_model(
         )
 
     number_of_epochs = end_epoch - start_epoch + 1
-    total_steps = len(train_loader) * number_of_epochs
+    total_steps = len(data_loader) * number_of_epochs
     training_scheduler = get_linear_schedule_with_warmup(
         optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps
     )
@@ -330,14 +339,7 @@ def train_model(
     avg_train_duration = 0.0
     avg_train_batch_time = 0.0
 
-    avg_val_loss = 0.0
-    avg_val_accuracy = 0.0
-    avg_val_duration = 0.0
-    avg_val_batch_time = 0.0
-
     for epoch in tqdm(range(start_epoch, end_epoch + 1)):
-        model.train()
-
         epoch_train_loss = 0.0
         epoch_train_accuracy = 0.0
         epoch_train_duration = 0.0
@@ -345,10 +347,10 @@ def train_model(
 
         train_epoch_start_time = time.time()
 
-        for batch_idx, train_batch in enumerate(train_loader):
-            input_ids = train_batch[0]
-            attention_mask = train_batch[1]
-            labels = train_batch[2]
+        for batch_idx, data_batch in enumerate(data_loader):
+            input_ids = data_batch[0]
+            attention_mask = data_batch[1]
+            labels = data_batch[2]
 
             input_ids = input_ids.view(input_ids.size(0), -1).to(device)
             attention_mask = attention_mask.view(attention_mask.size(0), -1).to(device)
@@ -367,7 +369,8 @@ def train_model(
             optimizer.step()
             training_scheduler.step()
 
-            y_pred = torch.argmax(logits, dim=1)
+            y_pred = log_softmax(logits, dim=1)
+            y_pred = torch.argmax(y_pred, dim=1)
             y_pred = y_pred.cpu().numpy()
             target = labels.cpu().numpy().reshape(labels.shape[0])
             batch_accuracy = accuracy_score(target, y_pred)
@@ -396,9 +399,9 @@ def train_model(
             del batch_start_time, batch_end_time
             del batch_duration
 
-        epoch_train_loss /= len(train_loader)
-        epoch_train_accuracy /= len(train_loader)
-        avg_train_batch_duration /= len(train_loader)
+        epoch_train_loss /= len(data_loader)
+        epoch_train_accuracy /= len(data_loader)
+        avg_train_batch_duration /= len(data_loader)
 
         train_epoch_end_time = time.time()
         epoch_train_duration = train_epoch_end_time - train_epoch_start_time
@@ -408,82 +411,12 @@ def train_model(
         avg_train_duration += epoch_train_duration
         avg_train_batch_time += avg_train_batch_duration
 
-        epoch_val_loss = 0.0
-        epoch_val_accuracy = 0.0
-        epoch_val_duration = 0.0
-        avg_val_batch_duration = 0.0
-
-        val_epoch_start_time = time.time()
-
-        model.eval()
-        with torch.no_grad():
-            for batch_idx, val_batch in enumerate(val_loader):
-                input_ids = val_batch[0]
-                attention_mask = val_batch[1]
-                labels = val_batch[2]
-
-                input_ids = input_ids.view(input_ids.size(0), -1).to(device)
-                attention_mask = attention_mask.view(attention_mask.size(0), -1).to(
-                    device
-                )
-                labels = labels.view(labels.size(0), -1).to(device)
-
-                batch_start_time = time.time()
-
-                output = model(input_ids, attention_mask=attention_mask, labels=labels)
-                loss = output.loss
-                logits = output.logits
-                batch_loss = loss.item()
-
-                y_pred = torch.argmax(logits, dim=1)
-                y_pred = y_pred.cpu().numpy()
-                target = labels.cpu().numpy().reshape(labels.shape[0])
-                batch_accuracy = accuracy_score(target, y_pred)
-
-                epoch_val_loss += batch_loss
-                epoch_val_accuracy += batch_accuracy
-
-                batch_end_time = time.time()
-                batch_duration = batch_end_time - batch_start_time
-                avg_val_batch_duration += batch_duration
-
-                if batch_idx % 100 == 0:
-                    write_string = "Epoch: {}, Val Batch Idx: {}, Val Batch Loss: {:.3f}, Val Batch Accuracy: {:.3f}, Val Batch Duration: {:.3f} seconds\n".format(
-                        epoch, batch_idx, batch_loss, batch_accuracy, batch_duration
-                    )
-                    with open(logs_path, "at") as logs_file:
-                        logs_file.write(write_string)
-                    del write_string
-
-                del input_ids, attention_mask, labels
-                del output, loss, logits
-                del target, y_pred
-                del batch_loss, batch_accuracy
-                del batch_start_time, batch_end_time
-                del batch_duration
-
-        epoch_val_loss /= len(val_loader)
-        epoch_val_accuracy /= len(val_loader)
-        avg_val_batch_duration /= len(val_loader)
-
-        val_epoch_end_time = time.time()
-        epoch_val_duration = val_epoch_end_time - val_epoch_start_time
-
-        avg_val_loss += epoch_val_loss
-        avg_val_accuracy += epoch_val_accuracy
-        avg_val_duration += epoch_val_duration
-        avg_val_batch_time += avg_val_batch_duration
-
-        write_string = "Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}, Train Duration: {:.3f} seconds, Avg Train Batch Duration: {:.3f} seconds, Val Loss: {:.3f}, Val Accuracy: {:.3f}, Val Duration: {:.3f} seconds, Avg Val Batch Duration: {:.3f} seconds\n".format(
+        write_string = "Epoch: {}, Train Loss: {:.3f}, Train Accuracy: {:.3f}, Train Duration: {:.3f} seconds, Avg Train Batch Duration: {:.3f} seconds\n".format(
             epoch,
             epoch_train_loss,
             epoch_train_accuracy,
             epoch_train_duration,
             avg_train_batch_duration,
-            epoch_val_loss,
-            epoch_val_accuracy,
-            epoch_val_duration,
-            avg_val_batch_duration,
         )
         with open(logs_path, "at") as logs_file:
             logs_file.write(write_string)
@@ -505,35 +438,21 @@ def train_model(
         del epoch_train_duration, avg_train_batch_duration
         del train_epoch_start_time, train_epoch_end_time
 
-        del epoch_val_loss, epoch_val_accuracy
-        del epoch_val_duration, avg_val_batch_duration
-        del val_epoch_start_time, val_epoch_end_time
-
     avg_train_loss /= number_of_epochs
     avg_train_accuracy /= number_of_epochs
     avg_train_duration /= number_of_epochs
     avg_train_batch_time /= number_of_epochs
-    avg_val_loss /= number_of_epochs
-    avg_val_accuracy /= number_of_epochs
-    avg_val_duration /= number_of_epochs
-    avg_val_batch_time /= number_of_epochs
 
-    write_string = "Avg Train Loss: {:.3f}, Avg Train Accuracy: {:.3f}, Avg Train Duration: {:.3f} seconds, Avg Train Batch Duration: {:.3f} seconds, Avg Val Loss: {:.3f}, Avg Val Accuracy: {:.3f}, Avg Val Duration: {:.3f} seconds, Avg Val Batch Duration: {:.3f} seconds,\n".format(
+    write_string = "Avg Train Loss: {:.3f}, Avg Train Accuracy: {:.3f}, Avg Train Duration: {:.3f} seconds, Avg Train Batch Duration: {:.3f} seconds\n".format(
         avg_train_loss,
         avg_train_accuracy,
         avg_train_duration,
         avg_train_batch_time,
-        avg_val_loss,
-        avg_val_accuracy,
-        avg_val_duration,
-        avg_val_batch_time,
     )
     with open(logs_path, "at") as logs_file:
         logs_file.write(write_string)
         logs_file.write("----------------------------------------------\n")
-    del write_string
 
+    del write_string
     del avg_train_loss, avg_train_accuracy
     del avg_train_duration, avg_train_batch_time
-    del avg_val_loss, avg_val_accuracy
-    del avg_val_duration, avg_val_batch_time
