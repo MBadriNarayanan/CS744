@@ -22,16 +22,16 @@
         "taskName": "BaseModel"
     },
     "Train": {
-        "batchSize": 16,
+        "batchSize": 20,
         "startEpoch": 1,
-        "endEpoch": 5,
+        "endEpoch": 3,
         "learningRate": 5e-5,
         "continueFlag": false,
         "continueCheckpoint": ""
 
     },
     "Eval": {
-        "batchSize": 16,
-        "checkpointPath": "Checkpoints/BaseModel/Epoch_5.pt"
+        "batchSize": 20,
+        "checkpointPath": "Checkpoints/BaseModel/Epoch_3.pt"
     }
 }
