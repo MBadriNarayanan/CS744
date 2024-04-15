@@ -4,10 +4,10 @@ import json
 import torch
 
 from accelerate import Accelerator
-from datasets import load_dataset
+from transformers import get_linear_schedule_with_warmup
 from utils import (
     create_helper_directories,
-    generate_data_loader,
+    get_data_loader,
     prepare_base_model,
     prepare_model_for_training,
     train_model,
@@ -16,20 +16,14 @@ from utils import (
 
 def main(config):
     accelerator = Accelerator()
-    num_gpus = accelerator.device_count
+    num_gpus = torch.cuda.device_count()
     print("Number of GPUs present: {}!".format(num_gpus))
 
     model_name = config["Model"]["modelName"]
-    max_length = config["Model"]["sequenceLength"]
-    padding_value = config["Model"]["paddingValue"]
-    truncation_flag = config["Model"]["truncationFlag"]
-    return_tensors = config["Model"]["returnTensors"]
-    special_token_flag = config["Model"]["specialTokenFlag"]
 
     dataset_class = config["Dataset"]["datasetClass"]
     dataset_name = config["Dataset"]["datasetName"]
     label_count = config["Dataset"]["labelCount"]
-    shuffle_flag = config["Dataset"]["shuffleFlag"]
 
     checkpoint_dir = config["Logs"]["checkpointDirectory"]
     logs_dir = config["Logs"]["logsDirectory"]
@@ -61,22 +55,16 @@ def main(config):
     model, tokenizer = prepare_base_model(
         model_name=model_name, label_count=label_count
     )
-    dataset = load_dataset(dataset_class, dataset_name)
-
-    train_data = dataset["train"]
-    train_loader = generate_data_loader(
-        data=train_data,
+    train_loader = get_data_loader(
+        dataset_class=dataset_class,
+        dataset_name=dataset_name,
         tokenizer=tokenizer,
-        max_length=max_length,
-        padding_value=padding_value,
-        truncation_flag=truncation_flag,
-        return_tensors=return_tensors,
-        special_token_flag=special_token_flag,
+        accelerator=accelerator,
         batch_size=batch_size,
-        shuffle_flag=shuffle_flag,
+        eval_flag=False,
     )
 
-    model, optimizer, training_scheduler = prepare_model_for_training(
+    model, optimizer = prepare_model_for_training(
         model=model,
         device=device,
         learning_rate=learning_rate,
@@ -84,8 +72,15 @@ def main(config):
         continue_checkpoint_path=continue_checkpoint_path,
     )
 
-    model, optimizer, training_dataloader, training_scheduler = accelerator.prepare(
-        model, optimizer, training_dataloader, training_scheduler
+    num_epochs = end_epoch - start_epoch + 1
+    training_scheduler = get_linear_schedule_with_warmup(
+        optimizer=optimizer,
+        num_warmup_steps=100,
+        num_training_steps=(len(train_loader) * num_epochs),
+    )
+
+    model, optimizer, train_loader, training_scheduler = accelerator.prepare(
+        model, optimizer, train_loader, training_scheduler
     )
 
     train_model(
