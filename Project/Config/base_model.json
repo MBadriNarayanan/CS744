@@ -1,7 +1,4 @@
 {
-    "Framework": {
-        "modelFramework": false
-    },
     "Model": {
         "modelName": "bert-base-uncased",
         "sequenceLength": 512,
