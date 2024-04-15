@@ -4,7 +4,6 @@ import json
 import torch
 
 from accelerate import Accelerator
-from datasets import load_dataset
 from utils import (
     create_helper_directories,
     get_data_loader,
