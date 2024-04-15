@@ -11,12 +11,12 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from torch.optim import AdamW
 from torch.nn.functional import log_softmax
 from torch.nn.utils import clip_grad_norm_
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from transformers import (
     BertTokenizer,
     BertForSequenceClassification,
-    get_linear_schedule_with_warmup,
 )
 
 random_seed = 42
@@ -301,6 +301,7 @@ def prepare_model_for_training(
 ):
     model = model.to(device)
     optimizer = AdamW(model.parameters(), lr=learning_rate)
+    training_scheduler = StepLR(optimizer=optimizer, step_size=10, gamma=0.1)
     if continue_flag:
         print("Model loaded for further training!")
         checkpoint = torch.load(continue_checkpoint_path)
@@ -310,16 +311,18 @@ def prepare_model_for_training(
         print("Prepared model for training!")
     model.train()
     get_model_parameters(model=model)
-    return model, optimizer
+    return model, optimizer, training_scheduler
 
 
 def train_model(
     model,
     device,
+    accelerator,
     optimizer,
     start_epoch,
     end_epoch,
     data_loader,
+    training_scheduler,
     logs_path,
     checkpoint_dir,
 ):
@@ -329,10 +332,6 @@ def train_model(
         )
 
     number_of_epochs = end_epoch - start_epoch + 1
-    total_steps = len(data_loader) * number_of_epochs
-    training_scheduler = get_linear_schedule_with_warmup(
-        optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps
-    )
 
     avg_train_loss = 0.0
     avg_train_accuracy = 0.0
@@ -363,9 +362,9 @@ def train_model(
             loss = output.loss
             logits = output.logits
             batch_loss = loss.item()
+            
             clip_grad_norm_(model.parameters(), 1.0)
-
-            loss.backward()
+            accelerator.backward(loss)
             optimizer.step()
             training_scheduler.step()
 
@@ -424,11 +423,12 @@ def train_model(
         del write_string
 
         ckpt_path = "{}/Epoch_{}.pt".format(checkpoint_dir, epoch)
-        torch.save(
+        accelerator.save(
             {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
+                'scheduler_state_dict': training_scheduler.state_dict(),
                 "loss": epoch_train_loss,
             },
             ckpt_path,
