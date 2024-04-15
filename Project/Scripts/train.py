@@ -3,6 +3,7 @@ import json
 
 import torch
 
+from accelerate import Accelerator
 from datasets import load_dataset
 from utils import (
     create_helper_directories,
@@ -14,8 +15,9 @@ from utils import (
 
 
 def main(config):
-    if config["Framework"]["modelFramework"]:
-        print("Using Megatron LM for Model finetuning!")
+    accelerator = Accelerator()
+    num_gpus = accelerator.device_count
+    print("Number of GPUs present: {}!".format(num_gpus))
 
     model_name = config["Model"]["modelName"]
     max_length = config["Model"]["sequenceLength"]
@@ -45,7 +47,7 @@ def main(config):
     )
 
     if torch.cuda.is_available():
-        device = torch.device("cuda")
+        device = accelerator.device
         print("CUDA available!")
     elif torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -74,20 +76,27 @@ def main(config):
         shuffle_flag=shuffle_flag,
     )
 
-    model, optimizer = prepare_model_for_training(
+    model, optimizer, training_scheduler = prepare_model_for_training(
         model=model,
         device=device,
         learning_rate=learning_rate,
         continue_flag=continue_flag,
         continue_checkpoint_path=continue_checkpoint_path,
     )
+
+    model, optimizer, training_dataloader, training_scheduler = accelerator.prepare(
+        model, optimizer, training_dataloader, training_scheduler
+    )
+
     train_model(
         model=model,
         device=device,
+        accelerator=accelerator,
         optimizer=optimizer,
         start_epoch=start_epoch,
         end_epoch=end_epoch,
         data_loader=train_loader,
+        training_scheduler=training_scheduler,
         logs_path=logs_path,
         checkpoint_dir=checkpoint_dir,
     )
