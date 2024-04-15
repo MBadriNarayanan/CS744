@@ -3,10 +3,11 @@ import json
 
 import torch
 
+from accelerate import Accelerator
 from datasets import load_dataset
 from utils import (
     create_helper_directories,
-    generate_data_loader,
+    get_data_loader,
     prepare_base_model,
     prepare_model_for_evaluation,
     evaluate_model,
@@ -14,20 +15,15 @@ from utils import (
 
 
 def main(config):
-    if config["Framework"]["modelFramework"]:
-        print("Using Megatron LM for Model finetuning!")
+    accelerator = Accelerator()
+    num_gpus = torch.cuda.device_count()
+    print("Number of GPUs present: {}!".format(num_gpus))
 
     model_name = config["Model"]["modelName"]
-    max_length = config["Model"]["sequenceLength"]
-    padding_value = config["Model"]["paddingValue"]
-    truncation_flag = config["Model"]["truncationFlag"]
-    return_tensors = config["Model"]["returnTensors"]
-    special_token_flag = config["Model"]["specialTokenFlag"]
 
     dataset_class = config["Dataset"]["datasetClass"]
     dataset_name = config["Dataset"]["datasetName"]
     label_count = config["Dataset"]["labelCount"]
-    shuffle_flag = config["Dataset"]["shuffleFlag"]
 
     checkpoint_dir = config["Logs"]["checkpointDirectory"]
     logs_dir = config["Logs"]["logsDirectory"]
@@ -49,7 +45,7 @@ def main(config):
     )
 
     if torch.cuda.is_available():
-        device = torch.device("cuda")
+        device = accelerator.device
         print("CUDA available!")
     elif torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -63,32 +59,22 @@ def main(config):
     model, tokenizer = prepare_base_model(
         model_name=model_name, label_count=label_count
     )
-    dataset = load_dataset(dataset_class, dataset_name)
 
-    val_data = dataset["validation"]
-    val_loader = generate_data_loader(
-        data=val_data,
+    val_loader = get_data_loader(
+        dataset_class=dataset_class,
+        dataset_name=dataset_name,
         tokenizer=tokenizer,
-        max_length=max_length,
-        padding_value=padding_value,
-        truncation_flag=truncation_flag,
-        return_tensors=return_tensors,
-        special_token_flag=special_token_flag,
+        accelerator=accelerator,
         batch_size=batch_size,
-        shuffle_flag=shuffle_flag,
+        eval_flag=False,
     )
-
-    test_data = dataset["test"]
-    test_loader = generate_data_loader(
-        data=test_data,
+    test_loader = get_data_loader(
+        dataset_class=dataset_class,
+        dataset_name=dataset_name,
         tokenizer=tokenizer,
-        max_length=max_length,
-        padding_value=padding_value,
-        truncation_flag=truncation_flag,
-        return_tensors=return_tensors,
-        special_token_flag=special_token_flag,
+        accelerator=accelerator,
         batch_size=batch_size,
-        shuffle_flag=shuffle_flag,
+        eval_flag=False,
     )
 
     model = prepare_model_for_evaluation(
