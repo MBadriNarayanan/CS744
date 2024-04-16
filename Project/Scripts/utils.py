@@ -7,12 +7,11 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from datasets import load_dataset
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from torch.optim import AdamW
 from torch.nn.functional import log_softmax
 from torch.nn.utils import clip_grad_norm_
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from transformers import BertTokenizer, BertForSequenceClassification, set_seed
 
@@ -21,6 +20,44 @@ torch.manual_seed(random_seed)
 np.random.seed(random_seed)
 set_seed(random_seed)
 warnings.filterwarnings("ignore")
+
+
+class GlueDataset(Dataset):
+    def __init__(
+        self,
+        data,
+        tokenizer,
+        max_length,
+        padding_value,
+        truncation_flag,
+        return_tensors,
+        special_token_flag,
+    ):
+        self.data = data
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        self.padding_value = padding_value
+        self.truncation_flag = truncation_flag
+        self.return_tensors = return_tensors
+        self.special_token_flag = special_token_flag
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        tokenized_data = self.tokenizer(
+            self.data[idx]["sentence"],
+            max_length=self.max_length,
+            padding=self.padding_value,
+            truncation=self.truncation_flag,
+            return_tensors=self.return_tensors,
+            add_special_tokens=self.special_token_flag,
+        )
+        input_ids = torch.tensor(tokenized_data["input_ids"])
+        attention_mask = torch.tensor(tokenized_data["attention_mask"])
+        label = torch.tensor(self.data[idx]["label"])
+        sentence = self.data[idx]["sentence"]
+        return (input_ids, attention_mask, label, sentence)
 
 
 def create_directory(directory):
@@ -72,53 +109,27 @@ def get_model_parameters(model):
 
 
 def get_data_loader(
-    dataset_class, dataset_name, tokenizer, accelerator, batch_size, eval_flag=False
+    data,
+    tokenizer,
+    max_length,
+    padding_value,
+    truncation_flag,
+    return_tensors,
+    special_token_flag,
+    batch_size,
+    shuffle_flag,
 ):
-    def tokenize_function(example):
-        outputs = tokenizer(example["sentence"], truncation=True, max_length=None)
-        return outputs
-
-    datasets = load_dataset(dataset_class, dataset_name)
-    with accelerator.main_process_first():
-        tokenized_datasets = datasets.map(
-            tokenize_function,
-            batched=True,
-        )
-
-    def collate_fn(example):
-        return tokenizer.pad(
-            example,
-            padding="longest",
-            max_length=None,
-            pad_to_multiple_of=None,
-            return_tensors="pt",
-        )
-
-    if eval_flag:
-        val_dataloader = DataLoader(
-            tokenized_datasets["validation"],
-            shuffle=False,
-            batch_size=batch_size,
-            drop_last=True,
-            collate_fn=collate_fn,
-        )
-        test_dataloader = DataLoader(
-            tokenized_datasets["test"],
-            shuffle=False,
-            batch_size=batch_size,
-            drop_last=True,
-            collate_fn=collate_fn,
-        )
-        return val_dataloader, test_dataloader
-
-    train_dataloader = DataLoader(
-        tokenized_datasets["train"],
-        shuffle=False,
-        batch_size=batch_size,
-        drop_last=True,
-        collate_fn=collate_fn,
+    data = GlueDataset(
+        data=data,
+        tokenizer=tokenizer,
+        max_length=max_length,
+        padding_value=padding_value,
+        truncation_flag=truncation_flag,
+        return_tensors=return_tensors,
+        special_token_flag=special_token_flag,
     )
-    return train_dataloader
+    data_loader = DataLoader(data, batch_size=batch_size, shuffle=shuffle_flag)
+    return data_loader
 
 
 def generate_report(
@@ -182,10 +193,10 @@ def evaluate_model(
     model.eval()
     with torch.no_grad():
         for data_batch in tqdm(data_loader):
-            input_ids = data_batch["input_ids"]
-            attention_mask = data_batch["attention_mask"]
-            labels = data_batch["label"]
-            sentence = data_batch["sentence"]
+            input_ids = data_batch[0]
+            attention_mask = data_batch[1]
+            labels = data_batch[2]
+            sentence = data_batch[3]
 
             input_ids = input_ids.view(input_ids.size(0), -1).to(device)
             attention_mask = attention_mask.view(attention_mask.size(0), -1).to(device)
@@ -332,9 +343,9 @@ def train_model(
         train_epoch_start_time = time.time()
 
         for batch_idx, data_batch in enumerate(data_loader):
-            input_ids = data_batch["input_ids"]
-            attention_mask = data_batch["attention_mask"]
-            labels = data_batch["label"]
+            input_ids = data_batch[0]
+            attention_mask = data_batch[1]
+            labels = data_batch[2]
 
             input_ids = input_ids.view(input_ids.size(0), -1).to(device)
             attention_mask = attention_mask.view(attention_mask.size(0), -1).to(device)
