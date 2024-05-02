@@ -25,11 +25,11 @@
         "learningRate": 5e-5,
         "continueFlag": false,
         "continueCheckpointPath": "",
-        "accelerateCheckpointDir": "Checkpoints/PipelineParallel"
+        "accelerateCheckpointDir": ""
 
     },
     "Eval": {
         "batchSize": 20,
-        "checkpointPath": "Checkpoints/PipelineParallel/Epoch_3.pt"
+        "checkpointPath": "Checkpoints/PipelineParallel"
     }
 }
