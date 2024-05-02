@@ -16,7 +16,7 @@
     "Logs": {
         "checkpointDirectory": "Checkpoints",
         "logsDirectory": "Logs",
-        "taskName": "BaseModel"
+        "taskName": "Baseline"
     },
     "Train": {
         "batchSize": 20,
@@ -24,11 +24,13 @@
         "endEpoch": 3,
         "learningRate": 5e-5,
         "continueFlag": false,
-        "continueCheckpoint": ""
+        "continueCheckpointPath": "",
+        "accelerateCheckpointDir": ""
 
     },
     "Eval": {
         "batchSize": 20,
-        "checkpointPath": "Checkpoints/BaseModel/Epoch_3.pt"
+        "checkpointPath": "Checkpoints/Baseline/Epoch_3.pt",
+        "accelerateCheckpointDir": ""
     }
 }
