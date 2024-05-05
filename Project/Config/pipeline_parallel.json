@@ -30,6 +30,7 @@
     },
     "Eval": {
         "batchSize": 20,
-        "checkpointPath": "Checkpoints/PipelineParallel"
+        "checkpointPath": "",
+        "accelerateCheckpointDir": "Checkpoints/PipelineParallel"
     }
 }
