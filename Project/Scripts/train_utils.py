@@ -87,8 +87,12 @@ def train_model_on_multiple_gpu(
         for batch_idx, data_batch in enumerate(data_loader):
             data_dict = {
                 "input_ids": torch.stack(data_batch["input_ids"], dim=1).to(device),
-                "attention_mask": torch.stack(data_batch["attention_mask"], dim=1).to(device),
-                "token_type_ids": torch.stack(data_batch["token_type_ids"], dim=1).to(device)
+                "attention_mask": torch.stack(data_batch["attention_mask"], dim=1).to(
+                    device
+                ),
+                "token_type_ids": torch.stack(data_batch["token_type_ids"], dim=1).to(
+                    device
+                ),
             }
             labels = data_batch["label"]
             labels = labels.view(labels.size(0), -1).to(device)
